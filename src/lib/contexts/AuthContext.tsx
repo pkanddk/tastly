@@ -1,22 +1,16 @@
 "use client";
 
-import React, { createContext, useEffect, useState } from "react";
-import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut } from "firebase/auth";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { User } from "firebase/auth";
 import { auth } from "../firebase/firebase";
 
-interface AuthContextType {
+export const AuthContext = createContext<{
   user: User | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType>({
+}>({
   user: null,
   loading: true,
-  signInWithGoogle: async () => {},
-  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -24,36 +18,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    // Handle redirect result when the app loads
+    const handleRedirectResult = async () => {
+      try {
+        // This is the key line we're missing - it resolves the pending promise
+        const result = await getRedirectResult(auth);
+        // No need to setUser here as onAuthStateChanged will handle it
+      } catch (error) {
+        console.error("Error handling redirect result:", error);
+      }
+    };
+    
+    // Handle redirect result first
+    handleRedirectResult();
+    
+    // Then set up the auth state listener
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return unsubscribe;
   }, []);
 
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error("Error signing in with Google", error);
-    }
-  };
-
-  const signOutUser = async () => {
-    try {
-      await firebaseSignOut(auth);
-    } catch (error) {
-      console.error("Error signing out", error);
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut: signOutUser }}>
+    <AuthContext.Provider value={{ user, loading }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export { AuthContext };
+export const useAuthContext = () => useContext(AuthContext);
