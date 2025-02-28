@@ -22,6 +22,37 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'www.epicurious.com',
       },
+      // WordPress image domains
+      {
+        protocol: 'https',
+        hostname: 'i0.wp.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i1.wp.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i2.wp.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i3.wp.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'i4.wp.com',
+      },
+      // Add downshiftology.com
+      {
+        protocol: 'https',
+        hostname: 'www.downshiftology.com',
+      },
+      // Add a wildcard pattern for WordPress domains
+      {
+        protocol: 'https',
+        hostname: '**.wp.com',
+      },
       // Add more domains as needed
     ],
   },
