@@ -2,6 +2,7 @@ import { AuthProvider } from '@/lib/contexts/AuthContext'
 import './globals.css'
 import type { Metadata } from 'next'
 import WelcomeBar from '@/components/WelcomeBar'
+import Footer from '@/components/Footer'
 
 export const metadata: Metadata = {
   title: 'Tastly - Recipe Saver',
@@ -22,6 +23,7 @@ export default function RootLayout({
             <main className="flex-grow">
               {children}
             </main>
+            <Footer />
           </div>
         </AuthProvider>
       </body>
