@@ -1,21 +1,35 @@
+import Image from 'next/image';
+
 export default function Home() {
   return (
-    <main className="min-h-screen p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Tastly</h1>
-        </div>
+    <main className="flex min-h-screen flex-col items-center p-4 md:p-8">
+      {/* Banner Image */}
+      <div className="w-full max-w-5xl mb-6 relative">
+        <Image
+          src="/images/tastly-banner.jpg"
+          alt="Tastly - Recipe Extraction and Organization Tool"
+          width={1200}
+          height={400}
+          className="rounded-lg shadow-md w-full h-auto"
+          priority
+        />
+      </div>
+      
+      {/* Content with reduced spacing */}
+      <div className="flex flex-col items-center space-y-4 mt-2">
+        <h1 className="text-3xl md:text-4xl font-bold text-center">
+          Welcome to Tastly
+        </h1>
+        <p className="text-xl text-center">
+          Only the Recipe.
+        </p>
         
-        <div className="mt-8 text-center">
-          <h2 className="text-2xl font-semibold mb-4">Welcome to Tastly</h2>
-          <p className="mb-4">Your recipe extraction and organization tool</p>
-          <a 
-            href="/recipe-extractor" 
-            className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors"
-          >
-            Go to Recipe Extractor
-          </a>
-        </div>
+        <a 
+          href="/recipe-extractor" 
+          className="mt-4 inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors"
+        >
+          Go to Recipe Extractor
+        </a>
       </div>
     </main>
   );
