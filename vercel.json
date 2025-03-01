@@ -1,0 +1,6 @@
+{
+  "buildCommand": "yarn install && yarn build",
+  "ignoreCommand": "echo 'Skipping linting'",
+  "installCommand": "yarn install",
+  "framework": "nextjs"
+} 
