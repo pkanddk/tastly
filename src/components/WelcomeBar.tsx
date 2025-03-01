@@ -10,35 +10,43 @@ export default function WelcomeBar() {
   if (loading) return null;
 
   return (
-    <div className="bg-gray-800 border-b border-gray-700">
+    <header className="sticky top-0 z-50 bg-gray-900 border-b border-gray-800 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-        {user ? (
-          <div className="flex items-center gap-4">
-            <div className="text-white">
-              <span className="font-medium">Welcome back, </span>
-              <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
+        <Link href="/" className="text-xl font-bold text-white hover:text-blue-400 transition-colors">
+          Welcome to Tastly
+        </Link>
+        
+        <div>
+          {loading ? (
+            <span className="text-gray-400">Loading...</span>
+          ) : user ? (
+            <div className="flex items-center gap-4">
+              <div className="text-white">
+                <span className="font-medium">Welcome back, </span>
+                <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
+              </div>
+              <div className="h-6 border-l border-gray-600"></div>
+              
+              <Link href="/recipe-extractor" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Extract Recipe
+              </Link>
+              
+              <Link href="/my-recipes" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                My Recipes
+              </Link>
             </div>
-            <div className="h-6 border-l border-gray-600"></div>
-            
-            <Link href="/recipe-extractor" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Extract Recipe
-            </Link>
-            
-            <Link href="/my-recipes" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-              </svg>
-              My Recipes
-            </Link>
-          </div>
-        ) : (
-          <div className="text-gray-300">
-            <span>Welcome to Tastly</span>
-          </div>
-        )}
+          ) : (
+            <span className="text-gray-400">
+              Not signed in
+            </span>
+          )}
+        </div>
 
         <div>
           {user ? (
@@ -68,6 +76,6 @@ export default function WelcomeBar() {
           )}
         </div>
       </div>
-    </div>
+    </header>
   );
 } 

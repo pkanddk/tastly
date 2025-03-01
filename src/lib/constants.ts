@@ -1,0 +1,21 @@
+export const END_MESSAGES = [
+  "This recipe brought to you by: just the recipe. That's it. That's the sponsor. 🎯",
+  "Fun fact: You just saved 12 minutes not reading about why this blogger's spouse 'absolutely adores' this dish. 💑",
+  "We removed 17 paragraphs about a life-changing trip to Italy. You're welcome. 🍝",
+  "Recipe websites 🤝 Novels about someone's journey to discovering paprika",
+  "Plot twist: We don't care that it was 'a crisp autumn morning' when this recipe was discovered. 🍂",
+  "Tastly: Because 'Jump to Recipe' buttons shouldn't need to exist. ⏩",
+  "Dear Food Bloggers: We're not saying your stories aren't interesting, but... well, actually, that's exactly what we're saying. 📝",
+  "Just like grandma used to make, minus grandma's 45-minute backstory. 👵",
+  "We'll never tell you how this recipe changed our marriage. (It didn't.) 💍",
+  "Tastly: For people who search 'chicken recipe' and actually want a chicken recipe. 🍗",
+  "We cut the fluff so you can get to the stuff. ✂️",
+  "We just saved you approximately 7 minutes of scrolling. You're welcome! 😉",
+  "No life stories were read in the making of this recipe. 🙌",
+  "We cut through 12 paragraphs about someone's trip to Italy so you didn't have to. 🍝",
+  "Zero stories, 100% recipe. That's how we roll. 🍪",
+  "Recipe extracted, life story deleted. Enjoy! 🥂",
+  "Tastly: Because nobody has time to read about your dog's reaction to banana bread. 🐕🍌",
+  "We removed approximately 1,500 unnecessary words to bring you this recipe. 📝✂️",
+  "Life is too short to scroll through food blogs. You're welcome. ⏱️"
+]; 

@@ -15,8 +15,13 @@ import {
   deleteDoc,
   query,
   where,
+  setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
+// Add this near the top of the file
+export const DEFAULT_RECIPE_IMAGE = "/images/banner.jpg";
 
 // Auth functions
 export const signOut = async () => {
@@ -155,4 +160,59 @@ export const getRecipeById = async (recipeId: string) => {
     console.error('Error getting recipe:', error);
     throw error;
   }
+};
+
+export const cacheRecipeUrl = async (url: string, recipeData: any) => {
+  try {
+    // Create a hash of the URL to use as a key
+    const urlHash = await createHash(url);
+    
+    // Store in Firestore with TTL of 7 days
+    const cacheRef = doc(db, 'recipe_cache', urlHash);
+    await setDoc(cacheRef, {
+      url,
+      recipeData,
+      timestamp: serverTimestamp(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error caching recipe:', error);
+    return false;
+  }
+};
+
+export const getRecipeFromCache = async (url: string) => {
+  try {
+    const urlHash = await createHash(url);
+    const cacheRef = doc(db, 'recipe_cache', urlHash);
+    const docSnap = await getDoc(cacheRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      
+      // Check if cache has expired
+      if (data.expiresAt && data.expiresAt.toDate() > new Date()) {
+        return data.recipeData;
+      }
+      
+      // Cache expired, delete it
+      await deleteDoc(cacheRef);
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting cached recipe:', error);
+    return null;
+  }
+};
+
+// Helper function to create a hash of a string
+const createHash = async (text: string) => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };

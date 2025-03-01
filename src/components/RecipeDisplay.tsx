@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { saveRecipe, signInWithGoogle } from '@/lib/firebase/firebaseUtils';
+import { END_MESSAGES } from '@/lib/constants';
 
 export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, recipeImage: string | null }) {
   // Add state for showing/hiding the shopping list
@@ -12,6 +13,17 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  
+  // Add state for the end message
+  const [endMessage, setEndMessage] = useState('');
+  
+  // Select a random message when the component mounts or recipe changes
+  useEffect(() => {
+    if (recipe) {
+      const randomIndex = Math.floor(Math.random() * END_MESSAGES.length);
+      setEndMessage(END_MESSAGES[randomIndex]);
+    }
+  }, [recipe]);
   
   // Extract all ingredients into a flat array
   const extractIngredients = () => {
@@ -120,9 +132,9 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
     };
     
     return (
-      <div className="bg-gray-900 rounded-xl p-6 shadow-lg relative">
+      <div className="bg-gray-900 rounded-xl shadow-lg relative mb-8">
         {recipeImage && (
-          <div className="mb-6 rounded-xl overflow-hidden relative h-64 w-full">
+          <div className="rounded-t-xl overflow-hidden relative h-64 w-full">
             <Image 
               src={recipeImage} 
               alt="Recipe image" 
@@ -158,52 +170,62 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
           </div>
         )}
         
-        {/* Recipe metadata display - modern style */}
-        {(prepTimeMatch || cookTimeMatch || totalTimeMatch || servingsMatch) && (
-          <div className="bg-gray-800 rounded-xl p-4 mb-6 flex flex-wrap justify-around items-center gap-2 shadow-md">
-            {prepTimeMatch && (
-              <div className="flex items-center gap-2 px-3 py-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-gray-300">Prep: <span className="text-white">{prepTimeMatch[1]}</span></span>
-              </div>
-            )}
-            
-            {cookTimeMatch && (
-              <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
-                </svg>
-                <span className="text-gray-300">Cook: <span className="text-white">{cookTimeMatch[1]}</span></span>
-              </div>
-            )}
-            
-            {totalTimeMatch && (
-              <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-gray-300">Total: <span className="text-white">{totalTimeMatch[1]}</span></span>
-              </div>
-            )}
-            
-            {servingsMatch && (
-              <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span className="text-gray-300">Serves: <span className="text-white">{servingsMatch[1]}</span></span>
-              </div>
-            )}
-          </div>
-        )}
-        
-        <div 
-          className="prose prose-invert max-w-none" 
-          dangerouslySetInnerHTML={{ __html: formattedMarkdown }} 
-        />
+        {/* Recipe content with better padding */}
+        <div className="p-5">
+          {/* Recipe metadata display - modern style */}
+          {(prepTimeMatch || cookTimeMatch || totalTimeMatch || servingsMatch) && (
+            <div className="bg-gray-800 rounded-xl p-4 mb-6 flex flex-wrap justify-around items-center gap-2 shadow-md">
+              {prepTimeMatch && (
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-gray-300">Prep: <span className="text-white">{prepTimeMatch[1]}</span></span>
+                </div>
+              )}
+              
+              {cookTimeMatch && (
+                <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                  </svg>
+                  <span className="text-gray-300">Cook: <span className="text-white">{cookTimeMatch[1]}</span></span>
+                </div>
+              )}
+              
+              {totalTimeMatch && (
+                <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-gray-300">Total: <span className="text-white">{totalTimeMatch[1]}</span></span>
+                </div>
+              )}
+              
+              {servingsMatch && (
+                <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <span className="text-gray-300">Serves: <span className="text-white">{servingsMatch[1]}</span></span>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div 
+            className="prose prose-invert max-w-none" 
+            dangerouslySetInnerHTML={{ __html: formattedMarkdown }} 
+          />
+          
+          {/* Add the fun message at the end if we have a recipe */}
+          {recipe && endMessage && (
+            <div className="mt-12 pt-6 border-t border-gray-700 text-center">
+              <p className="text-amber-400 italic text-lg">{endMessage}</p>
+            </div>
+          )}
+        </div>
         
         {/* If no recipe image, show the button in the fixed position */}
         {!recipeImage && (
@@ -233,9 +255,9 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
   
   // If we have a structured object, render it normally
   return (
-    <div className="bg-gray-900 rounded-xl p-6 shadow-lg relative">
+    <div className="bg-gray-900 rounded-xl shadow-lg relative mb-8">
       {recipeImage && (
-        <div className="mb-6 rounded-xl overflow-hidden relative h-64 w-full">
+        <div className="rounded-t-xl overflow-hidden relative h-64 w-full">
           <Image 
             src={recipeImage} 
             alt={parsedRecipe.title || 'Recipe image'} 

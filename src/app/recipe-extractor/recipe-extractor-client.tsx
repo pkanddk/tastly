@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import RecipeDisplay from '@/components/RecipeDisplay';
+import { DEFAULT_RECIPE_IMAGE, getRecipeFromCache, cacheRecipeUrl } from '@/lib/firebase/firebaseUtils';
 
 export default function RecipeExtractorClient() {
   const [url, setUrl] = useState('');
@@ -39,7 +40,7 @@ export default function RecipeExtractorClient() {
       
       fetchImage();
     }
-  }, [url, recipe, loading]);
+  }, [url, loading]);
 
   const handleExtract = async () => {
     if (!url) {
@@ -52,34 +53,50 @@ export default function RecipeExtractorClient() {
       setError(null);
       setRecipeImage(null);
       
-      const response = await fetch('/api/extract-recipe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url }),
-      });
+      // Check cache first
+      const cachedRecipe = await getRecipeFromCache(url);
+      
+      if (cachedRecipe) {
+        // Use cached recipe
+        setRecipe(cachedRecipe);
+        
+        // Still try to get the image in the background
+        fetchImage(url);
+      } else {
+        // Fetch fresh recipe
+        const response = await fetch('/api/extract-recipe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url }),
+        });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to extract recipe');
-      }
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to extract recipe');
+        }
 
-      // If we got here, data should be the recipe content
-      let extractedRecipe = data;
-      
-      // Remove any markdown delimiters if it's a string
-      if (typeof extractedRecipe === 'string') {
-        // Remove ```markdown at the beginning
-        extractedRecipe = extractedRecipe.replace(/^```markdown\s*/i, '');
-        // Remove ``` at the end
-        extractedRecipe = extractedRecipe.replace(/\s*```\s*$/i, '');
-        // Remove any "markdown" text at the beginning
-        extractedRecipe = extractedRecipe.replace(/^markdown\s*/i, '');
+        // Extract the markdown content from the response
+        let extractedRecipe = data.markdown || data.content || data;
+        
+        // Cache the recipe for future use
+        cacheRecipeUrl(url, extractedRecipe);
+        
+        // Process the recipe data
+        // Remove any markdown delimiters if it's a string
+        if (typeof extractedRecipe === 'string') {
+          extractedRecipe = extractedRecipe.replace(/^```markdown\s*/i, '');
+          extractedRecipe = extractedRecipe.replace(/\s*```\s*$/i, '');
+          extractedRecipe = extractedRecipe.replace(/^markdown\s*/i, '');
+        }
+        
+        setRecipe(extractedRecipe);
+        
+        // Fetch image
+        fetchImage(url);
       }
-      
-      setRecipe(extractedRecipe);
     } catch (err) {
       setError('Failed to extract recipe. Please try a different URL.');
       console.error(err);
@@ -88,11 +105,34 @@ export default function RecipeExtractorClient() {
     }
   };
 
+  // Separate function to fetch image
+  const fetchImage = async (url: string) => {
+    try {
+      const response = await fetch('/api/extract-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.imageUrl) {
+          setRecipeImage(data.imageUrl);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to extract image:', err);
+      // Don't show error to user, just fail silently
+    }
+  };
+
   const formatRecipe = (recipe: any) => {
     if (!recipe) return null;
 
     try {
-      return <RecipeDisplay recipe={recipe} recipeImage={recipeImage} />;
+      return <RecipeDisplay recipe={recipe} recipeImage={recipeImage || DEFAULT_RECIPE_IMAGE} />;
     } catch (error) {
       // If parsing fails, display as formatted text
       // Remove any markdown delimiters
@@ -109,19 +149,17 @@ export default function RecipeExtractorClient() {
       const formattedText = formatMarkdown(recipeText);
       
       return (
-        <div className="custom-recipe-container bg-gray-900 rounded-xl p-6 shadow-lg">
-          {recipeImage && (
-            <div className="recipe-image-container mb-6 rounded-xl overflow-hidden relative h-64 w-full">
-              <Image 
-                src={recipeImage} 
-                alt="Recipe image" 
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 768px"
-              />
-            </div>
-          )}
-          <div className="prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: formattedText }} />
+        <div className="custom-recipe-container bg-gray-900 rounded-xl shadow-lg mb-8">
+          <div className="recipe-image-container rounded-t-xl overflow-hidden relative h-64 w-full">
+            <Image 
+              src={recipeImage || DEFAULT_RECIPE_IMAGE} 
+              alt="Recipe image" 
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 768px"
+            />
+          </div>
+          <div className="p-5 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: formattedText }} />
         </div>
       );
     }

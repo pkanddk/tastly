@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, onAuthStateChanged, getRedirectResult } from "firebase/auth";
+import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { User } from "firebase/auth";
 import { auth } from "../firebase/firebase";
 

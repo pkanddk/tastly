@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { getRecipesByUser, deleteRecipe, signInWithGoogle } from '@/lib/firebase/firebaseUtils';
+import { getRecipesByUser, deleteRecipe, signInWithGoogle, DEFAULT_RECIPE_IMAGE } from '@/lib/firebase/firebaseUtils';
 import Link from 'next/link';
 import Image from 'next/image';
 
 export default function MyRecipesPage() {
   const { user, loading } = useAuth();
-  const [recipes, setRecipes] = useState([]);
+  const [recipes, setRecipes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function MyRecipesPage() {
     loadRecipes();
   }, [user, loading]);
   
-  const handleDeleteRecipe = async (recipeId) => {
+  const handleDeleteRecipe = async (recipeId: string) => {
     if (confirm('Are you sure you want to delete this recipe?')) {
       try {
         await deleteRecipe(recipeId);
@@ -43,7 +43,7 @@ export default function MyRecipesPage() {
   
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-8">
+      <div className="bg-gray-900 text-white p-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold">My Recipes</h1>
@@ -67,7 +67,7 @@ export default function MyRecipesPage() {
   
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-8">
+      <div className="bg-gray-900 text-white p-4">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold">My Recipes</h1>
@@ -96,7 +96,7 @@ export default function MyRecipesPage() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8">
+    <div className="bg-gray-900 text-white p-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">My Recipes</h1>
@@ -122,16 +122,14 @@ export default function MyRecipesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recipes.map(recipe => (
               <div key={recipe.id} className="bg-gray-800 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                {recipe.imageUrl && (
-                  <div className="relative h-48 w-full">
-                    <Image
-                      src={recipe.imageUrl}
-                      alt={recipe.title}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                )}
+                <div className="relative h-48 w-full">
+                  <Image
+                    src={recipe.imageUrl || DEFAULT_RECIPE_IMAGE}
+                    alt={recipe.title}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
                 <div className="p-4">
                   <h2 className="text-xl font-bold mb-2">{recipe.title}</h2>
                   <p className="text-gray-400 text-sm mb-4">
