@@ -39,7 +39,7 @@ export default function RecipeExtractorClient() {
       
       fetchImage();
     }
-  }, [url, recipe]);
+  }, [url, recipe, loading]);
 
   const handleExtract = async () => {
     if (!url) {

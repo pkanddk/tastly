@@ -113,7 +113,7 @@ export default function MyRecipesPage() {
         
         {recipes.length === 0 ? (
           <div className="text-center py-12 bg-gray-800 rounded-xl">
-            <p className="text-gray-400 mb-4">You haven't saved any recipes yet</p>
+            <p className="text-gray-400 mb-4">You don&apos;t have any recipes yet</p>
             <Link href="/recipe-extractor" className="text-blue-400 hover:text-blue-300">
               Extract a recipe now
             </Link>
