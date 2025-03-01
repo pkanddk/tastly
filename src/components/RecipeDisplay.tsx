@@ -248,7 +248,12 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
           />
         )}
         
-        {showLoginPrompt && <LoginPrompt />}
+        {showLoginPrompt && (
+          <LoginPrompt 
+            onClose={() => setShowLoginPrompt(false)} 
+            onSignIn={handleSaveRecipe} 
+          />
+        )}
       </div>
     );
   }
@@ -829,12 +834,19 @@ function formatMarkdown(text: string) {
   return html;
 }
 
-// Add a login prompt modal
-const LoginPrompt = () => (
+// Move the LoginPrompt component outside of the main component
+// and update it to accept props
+const LoginPrompt = ({ 
+  onClose, 
+  onSignIn 
+}: { 
+  onClose: () => void, 
+  onSignIn: () => void 
+}) => (
   <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
     <div className="bg-gray-900 rounded-xl max-w-md w-full p-6 relative">
       <button 
-        onClick={() => setShowLoginPrompt(false)}
+        onClick={onClose}
         className="absolute top-3 right-3 text-gray-400 hover:text-white"
         aria-label="Close login prompt"
       >
@@ -851,9 +863,9 @@ const LoginPrompt = () => (
           try {
             const success = await signInWithGoogle();
             if (success) {
-              setShowLoginPrompt(false);
+              onClose();
               // Try to save again after successful login
-              handleSaveRecipe();
+              onSignIn();
             }
           } catch (error) {
             // Error is already logged in the signInWithGoogle function
