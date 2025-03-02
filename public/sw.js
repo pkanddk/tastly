@@ -10,9 +10,9 @@ self.addEventListener("install", function(event) {
       return cache.addAll([
         OFFLINE_URL,
         "/",
-        "/icon-192.png",
-        "/icon-512.png",
-        "/apple-icon.png",
+        "/icon-192.jpg",
+        "/icon-512.jpg",
+        "/apple-icon.jpg",
         "/images/banner.jpg"
       ]);
     })
