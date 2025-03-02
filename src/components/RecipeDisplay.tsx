@@ -134,7 +134,7 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
     return (
       <div className="bg-gray-900 rounded-xl shadow-lg relative mb-8">
         {recipeImage && (
-          <div className="rounded-t-xl overflow-hidden relative h-64 w-full">
+          <div className="rounded-t-xl overflow-hidden relative h-48 sm:h-64 w-full">
             <Image 
               src={recipeImage} 
               alt="Recipe image" 
@@ -143,104 +143,118 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
               sizes="(max-width: 768px) 100vw, 768px"
             />
             
-            {/* Shopping list button positioned in the bottom right of the image container */}
-            <button 
-              onClick={() => setShowShoppingList(true)}
-              className="absolute bottom-4 right-4 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg z-10"
-              aria-label="Show shopping list"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </button>
-            
-            {/* Save button positioned in the bottom left of the image container */}
-            <div className="absolute bottom-4 left-4 flex gap-2">
+            {/* Action buttons container with improved mobile layout */}
+            <div className="absolute bottom-4 right-4 flex flex-row gap-3">
+              {/* Save button */}
               <button 
                 onClick={handleSaveRecipe}
                 disabled={isSaving}
-                className="bg-amber-500 hover:bg-amber-600 text-white p-3 rounded-full shadow-lg z-10 transition-all"
+                className="bg-amber-500 hover:bg-amber-600 text-white p-2 sm:p-3 rounded-full shadow-lg z-10 transition-all"
                 aria-label={user ? "Save recipe" : "Sign in to save recipe"}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={saveSuccess ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill={saveSuccess ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+              </button>
+              
+              {/* Shopping list button */}
+              <button 
+                onClick={() => setShowShoppingList(true)}
+                className="bg-blue-500 hover:bg-blue-600 text-white p-2 sm:p-3 rounded-full shadow-lg z-10"
+                aria-label="Show shopping list"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </button>
             </div>
           </div>
         )}
         
-        {/* Recipe content with better padding */}
-        <div className="p-5">
-          {/* Recipe metadata display - modern style */}
+        {/* Recipe content with better padding for mobile */}
+        <div className="p-3 sm:p-5">
+          {/* Recipe metadata display - responsive for mobile */}
           {(prepTimeMatch || cookTimeMatch || totalTimeMatch || servingsMatch) && (
-            <div className="bg-gray-800 rounded-xl p-4 mb-6 flex flex-wrap justify-around items-center gap-2 shadow-md">
+            <div className="bg-gray-800 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 flex flex-wrap justify-around items-center gap-1 sm:gap-2 shadow-md">
               {prepTimeMatch && (
-                <div className="flex items-center gap-2 px-3 py-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-gray-300">Prep: <span className="text-white">{prepTimeMatch[1]}</span></span>
+                  <span className="text-gray-300 text-sm sm:text-base">Prep: <span className="text-white">{prepTimeMatch[1]}</span></span>
                 </div>
               )}
               
               {cookTimeMatch && (
-                <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 border-l border-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
                   </svg>
-                  <span className="text-gray-300">Cook: <span className="text-white">{cookTimeMatch[1]}</span></span>
+                  <span className="text-gray-300 text-sm sm:text-base">Cook: <span className="text-white">{cookTimeMatch[1]}</span></span>
                 </div>
               )}
               
               {totalTimeMatch && (
-                <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 border-l border-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-gray-300">Total: <span className="text-white">{totalTimeMatch[1]}</span></span>
+                  <span className="text-gray-300 text-sm sm:text-base">Total: <span className="text-white">{totalTimeMatch[1]}</span></span>
                 </div>
               )}
               
               {servingsMatch && (
-                <div className="flex items-center gap-2 px-3 py-2 border-l border-gray-700">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 border-l border-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  <span className="text-gray-300">Serves: <span className="text-white">{servingsMatch[1]}</span></span>
+                  <span className="text-gray-300 text-sm sm:text-base">Serves: <span className="text-white">{servingsMatch[1]}</span></span>
                 </div>
               )}
             </div>
           )}
           
+          {/* Recipe content with responsive text sizing */}
           <div 
-            className="prose prose-invert max-w-none" 
+            className="prose prose-sm sm:prose prose-invert max-w-none" 
             dangerouslySetInnerHTML={{ __html: formattedMarkdown }} 
           />
           
-          {/* Add the fun message at the end if we have a recipe */}
+          {/* Fun message with responsive spacing */}
           {recipe && endMessage && (
-            <div className="mt-12 pt-6 border-t border-gray-700 text-center">
-              <p className="text-amber-400 italic text-lg">{endMessage}</p>
+            <div className="mt-8 sm:mt-12 pt-4 sm:pt-6 border-t border-gray-700 text-center">
+              <p className="text-amber-400 italic text-base sm:text-lg">{endMessage}</p>
             </div>
           )}
         </div>
         
-        {/* If no recipe image, show the button in the fixed position */}
+        {/* If no recipe image, show the buttons in a fixed position */}
         {!recipeImage && (
-          <button 
-            onClick={() => setShowShoppingList(true)}
-            className="fixed bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-full shadow-lg z-10"
-            aria-label="Show shopping list"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-          </button>
+          <div className="fixed bottom-6 right-6 flex flex-col gap-3 sm:gap-4">
+            <button 
+              onClick={handleSaveRecipe}
+              disabled={isSaving}
+              className="bg-amber-500 hover:bg-amber-600 text-white p-2 sm:p-3 rounded-full shadow-lg z-10 transition-all"
+              aria-label={user ? "Save recipe" : "Sign in to save recipe"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill={saveSuccess ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+            </button>
+            
+            <button 
+              onClick={() => setShowShoppingList(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white p-2 sm:p-3 rounded-full shadow-lg z-10"
+              aria-label="Show shopping list"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </button>
+          </div>
         )}
         
-        {/* Shopping list modal/panel */}
         {showShoppingList && (
           <ShoppingList 
             ingredients={extractIngredients()} 
@@ -354,7 +368,6 @@ export default function RecipeDisplay({ recipe, recipeImage }: { recipe: any, re
         </div>
       )}
       
-      {/* Shopping list modal/panel */}
       {showShoppingList && (
         <ShoppingList 
           ingredients={Array.isArray(parsedRecipe.ingredients) ? parsedRecipe.ingredients : []} 
@@ -847,10 +860,11 @@ const LoginPrompt = ({
     <div className="bg-gray-900 rounded-xl max-w-md w-full p-6 relative">
       <button 
         onClick={onClose}
-        className="absolute top-3 right-3 text-gray-400 hover:text-white"
+        type="button"
+        className="absolute top-3 right-3 text-gray-400 hover:text-white active:text-gray-200 touch-manipulation"
         aria-label="Close login prompt"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
@@ -871,12 +885,13 @@ const LoginPrompt = ({
             // Error is already logged in the signInWithGoogle function
           }
         }}
-        className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded flex items-center justify-center"
+        type="button"
+        className="w-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white py-3 px-4 rounded flex items-center justify-center touch-manipulation"
       >
-        <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+        <svg className="w-5 h-5 mr-2 pointer-events-none" viewBox="0 0 24 24">
           <path fill="#ffffff" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
         </svg>
-        Sign in with Google
+        <span className="pointer-events-none">Sign in with Google</span>
       </button>
     </div>
   </div>
