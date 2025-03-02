@@ -10,8 +10,13 @@ export default function MobileSignIn() {
     setIsSigningIn(true);
     try {
       console.log("Mobile sign-in button clicked");
-      await signInWithGoogle();
-      // The page will redirect, so code after this won't execute on mobile
+      const success = await signInWithGoogle();
+      
+      if (!success) {
+        console.log("Sign-in was not successful");
+        setIsSigningIn(false);
+      }
+      // If successful, the page will reload, so we don't need to reset isSigningIn
     } catch (error) {
       console.error("Mobile sign-in error:", error);
       setIsSigningIn(false);

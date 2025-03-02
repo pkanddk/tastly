@@ -4,7 +4,6 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { User } from "firebase/auth";
 import { auth } from "../firebase/firebase";
-import { checkRedirectResult, handleAuthRedirect } from "../firebase/firebaseUtils";
 
 export const AuthContext = createContext<{
   user: User | null;
@@ -22,39 +21,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log("Setting up auth state listener");
     
-    // First, check if we're returning from a redirect
-    const handleInitialAuth = async () => {
-      setLoading(true);
-      
+    // Check if we have a user in auth
+    const checkCurrentUser = async () => {
       try {
-        // This will check if we're returning from a redirect and process it
-        await checkRedirectResult();
+        console.log("Checking current user");
+        const currentUser = auth.currentUser;
+        console.log("Current user from auth:", currentUser ? currentUser.email : "No user");
         
-        // Handle redirect back to original page if needed
-        handleAuthRedirect();
+        if (currentUser) {
+          setUser(currentUser);
+        }
       } catch (error) {
-        console.error("Error during initial auth check:", error);
+        console.error("Error checking current user:", error);
       } finally {
         setInitialCheckDone(true);
       }
     };
     
-    handleInitialAuth();
+    checkCurrentUser();
     
-    // Then set up the auth state listener
+    // Set up the auth state listener
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log("Auth state changed:", user ? "User signed in" : "No user");
+      console.log("Auth state changed:", user ? `User signed in: ${user.email}` : "No user");
       setUser(user);
-      
-      if (initialCheckDone) {
-        setLoading(false);
-      }
+      setLoading(false);
     });
 
     return unsubscribe;
-  }, [initialCheckDone]);
+  }, []);
 
-  // Set loading to false once both initial check is done and auth state is determined
+  // Set loading to false once initial check is done
   useEffect(() => {
     if (initialCheckDone) {
       setLoading(false);

@@ -9,7 +9,8 @@ import {
   setPersistence,
   inMemoryPersistence,
   browserLocalPersistence,
-  onAuthStateChanged
+  onAuthStateChanged,
+  indexedDBLocalPersistence
 } from "firebase/auth";
 import {
   collection,
@@ -44,6 +45,7 @@ export const signOut = async () => {
 
 export const signInWithGoogle = async () => {
   try {
+    console.log("Starting Google sign-in process");
     const provider = new GoogleAuthProvider();
     
     // Add these parameters to improve compatibility
@@ -51,35 +53,53 @@ export const signInWithGoogle = async () => {
       prompt: 'select_account'
     });
     
-    console.log("Starting Google sign-in process");
+    // Always use popup for simplicity
+    console.log("Using popup for sign-in on all devices");
     
-    // Check if we're on a mobile device
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      console.log("Using mobile sign-in approach");
-      
-      // Set persistence to LOCAL to survive page reloads
-      await setPersistence(auth, browserLocalPersistence);
-      
-      // Store a flag to detect if we're in the middle of auth
-      localStorage.setItem('auth_pending', 'true');
-      localStorage.setItem('auth_timestamp', Date.now().toString());
-      
-      // Store the current URL so we can return to it after auth
-      localStorage.setItem('auth_return_url', window.location.pathname);
-      
-      // Use redirect method
-      await signInWithRedirect(auth, provider);
-      // Code after this won't execute on mobile due to redirect
-      return true;
-    } else {
-      // For desktop, use popup
-      console.log("Using popup for desktop sign-in");
-      const result = await signInWithPopup(auth, provider);
-      console.log("Sign-in successful");
-      return true;
+    // Set persistence to LOCAL to survive page reloads
+    // Use indexedDBLocalPersistence for better mobile support
+    try {
+      console.log("Setting persistence to indexedDBLocalPersistence");
+      await setPersistence(auth, indexedDBLocalPersistence);
+      console.log("Persistence set successfully");
+    } catch (persistError) {
+      console.error("Error setting persistence:", persistError);
+      // Fall back to browserLocalPersistence
+      try {
+        console.log("Falling back to browserLocalPersistence");
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (fallbackError) {
+        console.error("Error setting fallback persistence:", fallbackError);
+      }
     }
+    
+    // Use a smaller popup size on mobile
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const width = isMobile ? window.innerWidth * 0.9 : 500;
+    const height = isMobile ? window.innerHeight * 0.7 : 600;
+    
+    // Configure popup options
+    auth.config.popupRedirectResolver._getPopupWindow = function(name, url, width, height) {
+      const top = (window.innerHeight - height) / 2;
+      const left = (window.innerWidth - width) / 2;
+      return window.open(
+        url,
+        name,
+        `width=${width},height=${height},top=${top},left=${left}`
+      );
+    };
+    
+    console.log("Opening sign-in popup");
+    const result = await signInWithPopup(auth, provider);
+    console.log("Sign-in successful, user:", result.user.email);
+    
+    // Force a page reload to ensure the auth state is recognized
+    if (isMobile) {
+      console.log("Mobile device detected, reloading page to refresh auth state");
+      window.location.reload();
+    }
+    
+    return true;
   } catch (error) {
     console.error('Error signing in with Google:', error);
     
@@ -96,39 +116,51 @@ export const signInWithGoogle = async () => {
 export const checkRedirectResult = async () => {
   if (typeof window === 'undefined') return false;
   
+  console.log("A. Checking for redirect result");
   const pendingAuth = localStorage.getItem('auth_pending');
   const timestamp = localStorage.getItem('auth_timestamp');
+  
+  console.log(`B. Auth pending: ${pendingAuth}, Timestamp: ${timestamp}`);
   
   // Only process if we have a pending auth that's not too old (5 minutes max)
   if (pendingAuth === 'true' && timestamp) {
     const authTime = parseInt(timestamp, 10);
     const now = Date.now();
     const fiveMinutes = 5 * 60 * 1000;
+    const elapsed = now - authTime;
     
-    if (now - authTime < fiveMinutes) {
-      console.log("Detected return from auth redirect, checking result");
+    console.log(`C. Auth time: ${new Date(authTime).toISOString()}, Elapsed: ${elapsed}ms`);
+    
+    if (elapsed < fiveMinutes) {
+      console.log("D. Auth is recent, checking redirect result");
       try {
+        console.log("E. Calling getRedirectResult");
         const result = await getRedirectResult(auth);
+        console.log("F. Redirect result:", result ? "Success" : "No result");
         
         // Clear the pending flag regardless of result
         localStorage.removeItem('auth_pending');
         localStorage.removeItem('auth_timestamp');
         
         if (result && result.user) {
-          console.log("Redirect sign-in successful");
+          console.log("G. Redirect sign-in successful, user:", result.user.email);
           return true;
+        } else {
+          console.log("H. No user from redirect result");
         }
       } catch (error) {
-        console.error("Error handling redirect result:", error);
+        console.error("I. Error handling redirect result:", error);
         localStorage.removeItem('auth_pending');
         localStorage.removeItem('auth_timestamp');
       }
     } else {
       // Auth is too old, clear it
-      console.log("Clearing stale auth attempt");
+      console.log("J. Auth attempt is stale, clearing");
       localStorage.removeItem('auth_pending');
       localStorage.removeItem('auth_timestamp');
     }
+  } else {
+    console.log("K. No pending auth detected");
   }
   
   return false;
