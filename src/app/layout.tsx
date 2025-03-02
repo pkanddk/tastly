@@ -3,12 +3,14 @@ import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/lib/contexts/AuthContext'
 import { Metadata } from 'next'
 import WelcomeBar from '@/components/WelcomeBar'
+import Footer from '@/components/Footer'
+import Script from 'next/script'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Tastly - Your Personal Recipe Manager',
-  description: 'Extract recipes from any website, organize your collection, and never lose a recipe again.',
+  title: 'Tastly - Your Recipe Manager',
+  description: 'Extract, save, and organize your favorite recipes',
   icons: {
     icon: [
       { url: '/favicon.ico' },
@@ -23,10 +25,10 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Tastly',
+    title: 'Tastly'
   },
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
-  themeColor: '#1F2937',
+  themeColor: '#111827',
 }
 
 export default function RootLayout({
@@ -37,24 +39,34 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Add any additional meta tags here */}
+        <link rel="apple-touch-icon" href="/apple-icon.png" />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col`}>
         <AuthProvider>
-          <header className="sticky top-0 z-50 bg-gray-900 border-b border-gray-800 shadow-md">
-            <WelcomeBar />
-          </header>
-          
-          <main>
+          <WelcomeBar />
+          <main className="flex-grow">
             {children}
           </main>
-          
-          <footer>
-            <div className="container mx-auto px-4 py-4">
-              <p className="text-center text-gray-400">© 2025 Tastly. a pk and dk app.</p>
-            </div>
-          </footer>
+          <Footer />
         </AuthProvider>
+        
+        {/* Service Worker Registration */}
+        <Script id="register-sw" strategy="afterInteractive">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(
+                  function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                  },
+                  function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                  }
+                );
+              });
+            }
+          `}
+        </Script>
       </body>
     </html>
   )
