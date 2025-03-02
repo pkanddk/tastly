@@ -10,11 +10,22 @@ export default function WelcomeBar() {
   const { user, loading } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   
   // This ensures the component is only rendered client-side
   useEffect(() => {
     setMounted(true);
     setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+    
+    // Add resize listener to update mobile state
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize();
+    
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
   
   // Don't render anything during SSR or loading
@@ -23,40 +34,57 @@ export default function WelcomeBar() {
   return (
     <header className="sticky top-0 z-50 bg-gray-900 border-b border-gray-800 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
-        <Link href="/" className="text-xl font-bold text-white hover:text-blue-400 transition-colors">
-          Welcome to Tastly
+        {/* Logo/Title - Smaller on mobile */}
+        <Link href="/" className="text-lg sm:text-xl font-bold text-white hover:text-blue-400 transition-colors">
+          {isMobile ? 'Tastly' : 'Welcome to Tastly'}
         </Link>
         
-        <div>
-          {loading ? (
-            <span className="text-gray-400">Loading...</span>
-          ) : user ? (
-            <div className="flex items-center gap-4">
-              <div className="text-white">
-                <span className="font-medium">Welcome back, </span>
-                <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
+        {/* Mobile Menu Button */}
+        {isMobile && user && (
+          <button 
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="text-white p-2 focus:outline-none"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={menuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+            </svg>
+          </button>
+        )}
+        
+        {/* Desktop Navigation */}
+        {!isMobile && (
+          <div>
+            {loading ? (
+              <span className="text-gray-400">Loading...</span>
+            ) : user ? (
+              <div className="flex items-center gap-4">
+                <div className="text-white">
+                  <span className="font-medium">Welcome back, </span>
+                  <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
+                </div>
+                <div className="h-6 border-l border-gray-600"></div>
+                
+                <Link href="/recipe-extractor" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Extract Recipe
+                </Link>
+                
+                <Link href="/my-recipes" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  My Recipes
+                </Link>
               </div>
-              <div className="h-6 border-l border-gray-600"></div>
-              
-              <Link href="/recipe-extractor" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                Extract Recipe
-              </Link>
-              
-              <Link href="/my-recipes" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                My Recipes
-              </Link>
-            </div>
-          ) : (
-            <span></span>
-          )}
-        </div>
+            ) : (
+              <span></span>
+            )}
+          </div>
+        )}
 
+        {/* Sign In/Out Button */}
         <div>
           {user ? (
             <button
@@ -88,6 +116,38 @@ export default function WelcomeBar() {
           )}
         </div>
       </div>
+      
+      {/* Mobile Menu - Slide down when open */}
+      {isMobile && user && (
+        <div className={`bg-gray-800 overflow-hidden transition-all duration-300 ${menuOpen ? 'max-h-60' : 'max-h-0'}`}>
+          <div className="px-4 py-3 space-y-3">
+            <div className="text-white text-sm">
+              <span>Welcome back, </span>
+              <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
+            </div>
+            
+            <Link href="/recipe-extractor" 
+              className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 py-2"
+              onClick={() => setMenuOpen(false)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Extract Recipe
+            </Link>
+            
+            <Link href="/my-recipes" 
+              className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 py-2"
+              onClick={() => setMenuOpen(false)}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              My Recipes
+            </Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 } 
