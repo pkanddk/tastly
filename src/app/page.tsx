@@ -13,32 +13,24 @@ export default function HomePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [tagline, setTagline] = useState({ text: "", icon: "ban" });
+  const [url, setUrl] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   
   useEffect(() => {
     setMounted(true);
-    // Select a random tagline
-    const randomIndex = Math.floor(Math.random() * TAGLINES.length);
-    setTagline(TAGLINES[randomIndex]);
   }, []);
   
   if (!mounted) return null;
   
-  const handleMyRecipesClick = async () => {
-    if (user) {
-      // User is logged in, navigate to my-recipes
-      router.push('/my-recipes');
-    } else {
-      // User is not logged in, prompt for login
-      try {
-        const success = await signInWithGoogle();
-        if (success) {
-          // Successfully logged in, navigate to my-recipes
-          router.push('/my-recipes');
-        }
-      } catch (error) {
-        console.error('Error signing in:', error);
-      }
+  const handleExtractRecipe = async () => {
+    if (!url) return;
+    
+    try {
+      setIsLoading(true);
+      router.push(`/recipe-extractor?url=${encodeURIComponent(url)}`);
+    } catch (error) {
+      console.error('Error navigating to recipe extractor:', error);
+      setIsLoading(false);
     }
   };
   
@@ -68,12 +60,14 @@ export default function HomePage() {
           </div>
         </div>
         
-        {/* Tagline as a separate section with yellow styling and icon */}
+        {/* Tagline as a fixed "No ads ever" message */}
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-yellow-500 text-gray-900 px-4 py-2 rounded-lg shadow-md">
-            <TaglineIcon icon={tagline.icon} className="flex-shrink-0" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
             <p className="text-xl md:text-2xl font-bold">
-              {tagline.text}
+              No ads ever
             </p>
           </div>
         </div>
@@ -103,7 +97,7 @@ export default function HomePage() {
               </Link>
             ) : (
               <button 
-                onClick={handleMyRecipesClick}
+                onClick={signInWithGoogle}
                 className="flex-1 min-w-[150px] bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
