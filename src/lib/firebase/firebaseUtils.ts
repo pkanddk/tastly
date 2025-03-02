@@ -34,18 +34,24 @@ export const signOut = async () => {
 
 export const signInWithGoogle = async () => {
   const provider = new GoogleAuthProvider();
+  
   try {
     // First, check if we're in a mobile environment
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
     if (isMobile) {
       // For mobile devices, use redirect flow to avoid popup issues
+      console.log("Using redirect flow for mobile sign-in");
       await signInWithRedirect(auth, provider);
+      // Note: This function will redirect the page, so code after this won't execute
+      // The redirect result will be handled in AuthContext when the page loads again
+      return true;
     } else {
-      // For desktop, use popup but with better handling
-      await signInWithPopup(auth, provider);
+      // For desktop, use popup
+      console.log("Using popup flow for desktop sign-in");
+      const result = await signInWithPopup(auth, provider);
+      return true;
     }
-    return true;
   } catch (error) {
     console.error('Error signing in with Google:', error);
     

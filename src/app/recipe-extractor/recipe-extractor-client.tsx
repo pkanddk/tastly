@@ -53,53 +53,70 @@ export default function RecipeExtractorClient() {
       setError(null);
       setRecipeImage(null);
       
-      // Check cache first
-      const cachedRecipe = await getRecipeFromCache(url);
+      // Add a timeout to prevent hanging indefinitely
+      const extractionPromise = new Promise(async (resolve, reject) => {
+        try {
+          // Check cache first
+          const cachedRecipe = await getRecipeFromCache(url);
+          
+          if (cachedRecipe) {
+            // Use cached recipe
+            setRecipe(cachedRecipe);
+            
+            // Still try to get the image in the background
+            fetchImage(url);
+            resolve(cachedRecipe);
+          } else {
+            // Fetch fresh recipe
+            const response = await fetch('/api/extract-recipe', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ url }),
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+              throw new Error(data.error || 'Failed to extract recipe');
+            }
+
+            // Extract the markdown content from the response
+            let extractedRecipe = data.markdown || data.content || data;
+            
+            // Cache the recipe for future use
+            cacheRecipeUrl(url, extractedRecipe);
+            
+            // Process the recipe data
+            if (typeof extractedRecipe === 'string') {
+              extractedRecipe = extractedRecipe.replace(/^```markdown\s*/i, '');
+              extractedRecipe = extractedRecipe.replace(/\s*```\s*$/i, '');
+              extractedRecipe = extractedRecipe.replace(/^markdown\s*/i, '');
+            }
+            
+            setRecipe(extractedRecipe);
+            
+            // Fetch image
+            fetchImage(url);
+            resolve(extractedRecipe);
+          }
+        } catch (error) {
+          reject(error);
+        }
+      });
       
-      if (cachedRecipe) {
-        // Use cached recipe
-        setRecipe(cachedRecipe);
-        
-        // Still try to get the image in the background
-        fetchImage(url);
-      } else {
-        // Fetch fresh recipe
-        const response = await fetch('/api/extract-recipe', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url }),
-        });
-
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to extract recipe');
-        }
-
-        // Extract the markdown content from the response
-        let extractedRecipe = data.markdown || data.content || data;
-        
-        // Cache the recipe for future use
-        cacheRecipeUrl(url, extractedRecipe);
-        
-        // Process the recipe data
-        // Remove any markdown delimiters if it's a string
-        if (typeof extractedRecipe === 'string') {
-          extractedRecipe = extractedRecipe.replace(/^```markdown\s*/i, '');
-          extractedRecipe = extractedRecipe.replace(/\s*```\s*$/i, '');
-          extractedRecipe = extractedRecipe.replace(/^markdown\s*/i, '');
-        }
-        
-        setRecipe(extractedRecipe);
-        
-        // Fetch image
-        fetchImage(url);
-      }
+      // Set a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Recipe extraction timed out')), 30000);
+      });
+      
+      // Race the extraction against the timeout
+      await Promise.race([extractionPromise, timeoutPromise]);
+      
     } catch (err) {
-      setError('Failed to extract recipe. Please try a different URL.');
-      console.error(err);
+      console.error('Extraction error:', err);
+      setError(`Failed to extract recipe: ${err.message || 'Please try a different URL'}`);
     } finally {
       setLoading(false);
     }
