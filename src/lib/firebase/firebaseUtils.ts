@@ -4,6 +4,11 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   signInWithRedirect,
+  getRedirectResult,
+  browserSessionPersistence,
+  setPersistence,
+  inMemoryPersistence,
+  browserLocalPersistence
 } from "firebase/auth";
 import {
   collection,
@@ -26,6 +31,8 @@ export const DEFAULT_RECIPE_IMAGE = "/images/banner.jpg";
 // Auth functions
 export const signOut = async () => {
   try {
+    // Clear any stored auth state
+    localStorage.removeItem('auth_pending');
     await firebaseSignOut(auth);
   } catch (error) {
     console.error('Error signing out:', error);
@@ -47,11 +54,18 @@ export const signInWithGoogle = async () => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
     if (isMobile) {
-      // For mobile, use redirect method
+      // For mobile, use redirect method with proper persistence
       console.log("Using redirect for mobile sign-in");
+      
+      // Set persistence to LOCAL to survive page reloads
+      await setPersistence(auth, browserLocalPersistence);
+      
+      // Store a flag to detect if we're in the middle of auth
+      localStorage.setItem('auth_pending', 'true');
+      
+      // Use redirect method
       await signInWithRedirect(auth, provider);
-      // This line won't execute due to redirect
-      return true;
+      return true; // This line won't execute due to redirect
     } else {
       // For desktop, use popup
       console.log("Using popup for desktop sign-in");
@@ -69,6 +83,26 @@ export const signInWithGoogle = async () => {
     
     return false;
   }
+};
+
+// Check if we're returning from a redirect
+export const checkRedirectResult = async () => {
+  if (typeof window !== 'undefined' && localStorage.getItem('auth_pending') === 'true') {
+    console.log("Detected return from auth redirect, checking result");
+    try {
+      const result = await getRedirectResult(auth);
+      localStorage.removeItem('auth_pending');
+      
+      if (result) {
+        console.log("Redirect sign-in successful");
+        return true;
+      }
+    } catch (error) {
+      localStorage.removeItem('auth_pending');
+      console.error("Error handling redirect result:", error);
+    }
+  }
+  return false;
 };
 
 // Firestore functions
