@@ -33,34 +33,26 @@ export const signOut = async () => {
 };
 
 export const signInWithGoogle = async () => {
-  const provider = new GoogleAuthProvider();
-  
   try {
-    // First, check if we're in a mobile environment
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const provider = new GoogleAuthProvider();
     
-    if (isMobile) {
-      // For mobile devices, use redirect flow to avoid popup issues
-      console.log("Using redirect flow for mobile sign-in");
-      await signInWithRedirect(auth, provider);
-      // Note: This function will redirect the page, so code after this won't execute
-      // The redirect result will be handled in AuthContext when the page loads again
-      return true;
-    } else {
-      // For desktop, use popup
-      console.log("Using popup flow for desktop sign-in");
-      const result = await signInWithPopup(auth, provider);
-      return true;
-    }
+    // Add these parameters to improve compatibility
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
+    console.log("Starting Google sign-in process");
+    
+    // Use signInWithPopup for all devices
+    const result = await signInWithPopup(auth, provider);
+    console.log("Sign-in successful");
+    return true;
   } catch (error) {
     console.error('Error signing in with Google:', error);
     
-    // Don't show alerts for cancelled popups or redirects
-    if (
-      error.code !== 'auth/cancelled-popup-request' && 
-      error.code !== 'auth/popup-closed-by-user'
-    ) {
-      console.error('Authentication error:', error.message);
+    // Log specific error codes to help with debugging
+    if (error.code) {
+      console.error('Error code:', error.code);
     }
     
     return false;

@@ -3,11 +3,19 @@
 import { useAuth } from '@/lib/hooks/useAuth';
 import Link from 'next/link';
 import { signInWithGoogle, signOut } from '@/lib/firebase/firebaseUtils';
+import { useEffect, useState } from 'react';
 
 export default function WelcomeBar() {
   const { user, loading } = useAuth();
-
-  if (loading) return null;
+  const [mounted, setMounted] = useState(false);
+  
+  // This ensures the component is only rendered client-side
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Don't render anything during SSR or loading
+  if (!mounted) return null;
 
   return (
     <header className="sticky top-0 z-50 bg-gray-900 border-b border-gray-800 shadow-md">
@@ -42,9 +50,8 @@ export default function WelcomeBar() {
               </Link>
             </div>
           ) : (
-            <span className="text-gray-400">
-              Not signed in
-            </span>
+            // Empty span instead of "Not signed in"
+            <span></span>
           )}
         </div>
 
@@ -58,13 +65,11 @@ export default function WelcomeBar() {
             </button>
           ) : (
             <button
-              onClick={async () => {
-                try {
-                  const success = await signInWithGoogle();
-                  // No need to do anything on success, AuthContext will update
-                } catch (error) {
-                  // Error is already logged in the signInWithGoogle function
-                }
+              onClick={() => {
+                console.log("Sign in button clicked");
+                signInWithGoogle()
+                  .then(success => console.log("Sign in result:", success))
+                  .catch(error => console.error("Sign in error:", error));
               }}
               type="button"
               className="text-sm text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 px-3 py-1.5 rounded transition-colors flex items-center gap-2 touch-manipulation"
