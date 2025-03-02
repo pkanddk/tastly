@@ -1,23 +1,15 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { signInWithGoogle } from '@/lib/firebase/firebaseUtils';
-import { useRouter } from 'next/navigation';
 
 export default function MobileSignIn() {
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const router = useRouter();
   
   const handleSignIn = async () => {
     setIsSigningIn(true);
     try {
       console.log("Mobile sign-in button clicked");
-      
-      // Store the current URL so we can return to it after auth
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_return_url', window.location.pathname);
-      }
-      
       await signInWithGoogle();
       // The page will redirect, so code after this won't execute on mobile
     } catch (error) {
@@ -25,18 +17,6 @@ export default function MobileSignIn() {
       setIsSigningIn(false);
     }
   };
-  
-  // Check if we need to redirect after auth
-  useEffect(() => {
-    const returnUrl = localStorage.getItem('auth_return_url');
-    if (returnUrl) {
-      localStorage.removeItem('auth_return_url');
-      // Only redirect if we're not already on that page
-      if (window.location.pathname !== returnUrl) {
-        router.push(returnUrl);
-      }
-    }
-  }, [router]);
   
   return (
     <button

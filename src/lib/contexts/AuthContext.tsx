@@ -1,10 +1,10 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { User } from "firebase/auth";
 import { auth } from "../firebase/firebase";
-import { checkRedirectResult } from "../firebase/firebaseUtils";
+import { checkRedirectResult, handleAuthRedirect } from "../firebase/firebaseUtils";
 
 export const AuthContext = createContext<{
   user: User | null;
@@ -17,6 +17,7 @@ export const AuthContext = createContext<{
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   useEffect(() => {
     console.log("Setting up auth state listener");
@@ -28,8 +29,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         // This will check if we're returning from a redirect and process it
         await checkRedirectResult();
+        
+        // Handle redirect back to original page if needed
+        handleAuthRedirect();
       } catch (error) {
         console.error("Error during initial auth check:", error);
+      } finally {
+        setInitialCheckDone(true);
       }
     };
     
@@ -39,11 +45,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       console.log("Auth state changed:", user ? "User signed in" : "No user");
       setUser(user);
-      setLoading(false);
+      
+      if (initialCheckDone) {
+        setLoading(false);
+      }
     });
 
     return unsubscribe;
-  }, []);
+  }, [initialCheckDone]);
+
+  // Set loading to false once both initial check is done and auth state is determined
+  useEffect(() => {
+    if (initialCheckDone) {
+      setLoading(false);
+    }
+  }, [initialCheckDone]);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>

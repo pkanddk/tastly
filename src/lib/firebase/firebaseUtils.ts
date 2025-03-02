@@ -8,7 +8,8 @@ import {
   browserSessionPersistence,
   setPersistence,
   inMemoryPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  onAuthStateChanged
 } from "firebase/auth";
 import {
   collection,
@@ -34,8 +35,10 @@ export const signOut = async () => {
     // Clear any stored auth state
     localStorage.removeItem('auth_pending');
     await firebaseSignOut(auth);
+    return true;
   } catch (error) {
     console.error('Error signing out:', error);
+    return false;
   }
 };
 
@@ -54,18 +57,22 @@ export const signInWithGoogle = async () => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
     if (isMobile) {
-      // For mobile, use redirect method with proper persistence
-      console.log("Using redirect for mobile sign-in");
+      console.log("Using mobile sign-in approach");
       
       // Set persistence to LOCAL to survive page reloads
       await setPersistence(auth, browserLocalPersistence);
       
       // Store a flag to detect if we're in the middle of auth
       localStorage.setItem('auth_pending', 'true');
+      localStorage.setItem('auth_timestamp', Date.now().toString());
+      
+      // Store the current URL so we can return to it after auth
+      localStorage.setItem('auth_return_url', window.location.pathname);
       
       // Use redirect method
       await signInWithRedirect(auth, provider);
-      return true; // This line won't execute due to redirect
+      // Code after this won't execute on mobile due to redirect
+      return true;
     } else {
       // For desktop, use popup
       console.log("Using popup for desktop sign-in");
@@ -87,22 +94,59 @@ export const signInWithGoogle = async () => {
 
 // Check if we're returning from a redirect
 export const checkRedirectResult = async () => {
-  if (typeof window !== 'undefined' && localStorage.getItem('auth_pending') === 'true') {
-    console.log("Detected return from auth redirect, checking result");
-    try {
-      const result = await getRedirectResult(auth);
-      localStorage.removeItem('auth_pending');
-      
-      if (result) {
-        console.log("Redirect sign-in successful");
-        return true;
+  if (typeof window === 'undefined') return false;
+  
+  const pendingAuth = localStorage.getItem('auth_pending');
+  const timestamp = localStorage.getItem('auth_timestamp');
+  
+  // Only process if we have a pending auth that's not too old (5 minutes max)
+  if (pendingAuth === 'true' && timestamp) {
+    const authTime = parseInt(timestamp, 10);
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+    
+    if (now - authTime < fiveMinutes) {
+      console.log("Detected return from auth redirect, checking result");
+      try {
+        const result = await getRedirectResult(auth);
+        
+        // Clear the pending flag regardless of result
+        localStorage.removeItem('auth_pending');
+        localStorage.removeItem('auth_timestamp');
+        
+        if (result && result.user) {
+          console.log("Redirect sign-in successful");
+          return true;
+        }
+      } catch (error) {
+        console.error("Error handling redirect result:", error);
+        localStorage.removeItem('auth_pending');
+        localStorage.removeItem('auth_timestamp');
       }
-    } catch (error) {
+    } else {
+      // Auth is too old, clear it
+      console.log("Clearing stale auth attempt");
       localStorage.removeItem('auth_pending');
-      console.error("Error handling redirect result:", error);
+      localStorage.removeItem('auth_timestamp');
     }
   }
+  
   return false;
+};
+
+// Helper to handle redirect after auth
+export const handleAuthRedirect = () => {
+  if (typeof window === 'undefined') return;
+  
+  const returnUrl = localStorage.getItem('auth_return_url');
+  if (returnUrl) {
+    localStorage.removeItem('auth_return_url');
+    
+    // Only redirect if we're not already on that page
+    if (window.location.pathname !== returnUrl) {
+      window.location.href = returnUrl;
+    }
+  }
 };
 
 // Firestore functions
