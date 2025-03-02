@@ -1,93 +1,99 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { getRecipeById } from '@/lib/firebase/firebaseUtils';
-import RecipeDisplay from '@/components/RecipeDisplay';
 import { useAuth } from '@/lib/hooks/useAuth';
-import Link from 'next/link';
+import { getRecipeById } from '@/lib/firebase/firebaseUtils';
+import { useRouter } from 'next/navigation';
+import RecipeDisplay from '@/components/RecipeDisplay';
+import Image from 'next/image';
 
-export default function RecipePage() {
-  const params = useParams();
-  const recipeId = params.id as string;
+export default function RecipePage({ params }: { params: { id: string } }) {
+  const { user, loading } = useAuth();
   const [recipe, setRecipe] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth();
-
+  const router = useRouter();
+  
   useEffect(() => {
-    const fetchRecipe = async () => {
+    async function loadRecipe() {
+      if (loading) return; // Wait until auth state is determined
+      
       try {
-        const recipeData = await getRecipeById(recipeId);
+        // Only proceed with fetching if we have a user or have determined there's no user
+        const recipeData = await getRecipeById(params.id);
         
-        // Check if user has permission to view this recipe
-        if (recipeData.userId !== user?.uid) {
-          setError('You do not have permission to view this recipe');
-          setLoading(false);
-          return;
+        if (!recipeData) {
+          setError('Recipe not found');
+        } else {
+          // Check if the recipe belongs to the current user
+          if (user && user.uid === recipeData.userId) {
+            setRecipe(recipeData);
+          } else {
+            setError('Please sign in to view this recipe');
+          }
         }
-        
-        setRecipe(recipeData);
-      } catch (error) {
-        console.error('Error fetching recipe:', error);
-        setError('Recipe not found or error loading recipe');
+      } catch (err) {
+        console.error('Error loading recipe:', err);
+        setError('Failed to load recipe');
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
-    };
-
-    if (recipeId && user) {
-      fetchRecipe();
-    } else if (!user) {
-      setError('Please sign in to view this recipe');
-      setLoading(false);
     }
-  }, [recipeId, user]);
-
-  if (loading) {
+    
+    loadRecipe();
+  }, [params.id, user, loading]);
+  
+  // Show loading state
+  if (loading || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-          </div>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       </div>
     );
   }
-
+  
+  // Show error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 text-white p-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-2xl font-bold mb-4">Error</h1>
-          <p className="mb-6">{error}</p>
-          <Link href="/my-recipes" className="text-blue-400 hover:underline">
-            Return to My Recipes
-          </Link>
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-gray-800 rounded-xl p-6 text-center">
+          <h1 className="text-2xl font-bold text-red-500 mb-4">Error</h1>
+          <p className="text-gray-300 mb-6">{error}</p>
+          
+          {error === 'Please sign in to view this recipe' && !user && (
+            <button
+              onClick={() => router.push('/')}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg"
+            >
+              Go to Sign In
+            </button>
+          )}
+          
+          <button
+            onClick={() => router.push('/my-recipes')}
+            className="mt-4 text-blue-400 hover:text-blue-300"
+          >
+            Back to My Recipes
+          </button>
         </div>
       </div>
     );
   }
-
-  // Determine if we're dealing with markdown or structured recipe
-  const recipeContent = recipe.type === 'markdown' ? recipe.content : recipe;
-  const recipeImage = recipe.imageUrl || null;
-
-  return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <Link href="/my-recipes" className="text-blue-400 hover:underline flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to My Recipes
-          </Link>
-        </div>
-        
-        <RecipeDisplay recipe={recipeContent} recipeImage={recipeImage} />
+  
+  // Show recipe
+  if (recipe) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <RecipeDisplay 
+          recipe={recipe.content} 
+          recipeImage={recipe.imageUrl} 
+          url={recipe.url}
+        />
       </div>
-    </div>
-  );
+    );
+  }
+  
+  return null;
 } 

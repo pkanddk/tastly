@@ -18,4 +18,26 @@ export const END_MESSAGES = [
   "Tastly: Because nobody has time to read about your dog's reaction to banana bread. 🐕🍌",
   "We removed approximately 1,500 unnecessary words to bring you this recipe. 📝✂️",
   "Life is too short to scroll through food blogs. You're welcome. ⏱️"
+];
+
+export const TAGLINES = [
+  { text: "No ads ever.", icon: "ban" },
+  { text: "No scrolling required.", icon: "mouse" },
+  { text: "No ads, no life stories — just recipes.", icon: "book-open" },
+  { text: "Ad-free forever.", icon: "shield-check" },
+  { text: "Recipes without the family history lesson.", icon: "academic-cap" },
+  { text: "Because recipes shouldn't come with a memoir.", icon: "book" },
+  { text: "Absolutely zero childhood anecdotes.", icon: "x-circle" },
+  { text: "Zero stories about how this casserole saved a marriage.", icon: "heart" },
+  { text: "No ads or life stories. Ever.", icon: "ban" },
+  { text: "Skip the novel, get the recipe.", icon: "fast-forward" },
+  { text: "We won't tell you about our grandmother's trip to Italy.", icon: "globe" },
+  { text: "No pop-ups asking about your newsletter preferences.", icon: "mail" },
+  { text: "No 'Jump to Recipe' button needed.", icon: "arrow-down" },
+  { text: "No paragraphs before the ingredients.", icon: "document-text" },
+  { text: "Recipes without the family history lesson.", icon: "academic-cap" },
+  { text: "No scrolling marathon required.", icon: "mouse" },
+  { text: "We don't care what your kids think about this recipe.", icon: "user-group" },
+  { text: "No 'Pin this!' buttons every 3 paragraphs.", icon: "photograph" },
+  { text: "Recipes that get to the point.", icon: "lightning-bolt" }
 ]; 

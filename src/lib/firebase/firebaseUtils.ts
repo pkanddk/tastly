@@ -24,6 +24,7 @@ import {
   where,
   setDoc,
   serverTimestamp,
+  limit
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
@@ -31,11 +32,17 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 export const DEFAULT_RECIPE_IMAGE = "/images/banner.jpg";
 
 // Auth functions
-export const signOut = async () => {
+export const signOut = async (callback?: () => void) => {
   try {
     // Clear any stored auth state
     localStorage.removeItem('auth_pending');
     await firebaseSignOut(auth);
+    
+    // Execute callback if provided
+    if (callback) {
+      callback();
+    }
+    
     return true;
   } catch (error) {
     console.error('Error signing out:', error);
@@ -323,4 +330,25 @@ const createHash = async (text: string) => {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+/**
+ * Check if a recipe with the given title is already saved by the user
+ */
+export const checkIfRecipeSaved = async (userId: string, title: string): Promise<boolean> => {
+  try {
+    const recipesRef = collection(db, 'recipes');
+    const q = query(
+      recipesRef,
+      where('userId', '==', userId),
+      where('title', '==', title),
+      limit(1)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking if recipe is saved:', error);
+    return false;
+  }
 };
