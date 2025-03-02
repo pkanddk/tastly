@@ -73,22 +73,10 @@ export const signInWithGoogle = async () => {
       }
     }
     
-    // Use a smaller popup size on mobile
+    // Check if we're on a mobile device
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    const width = isMobile ? window.innerWidth * 0.9 : 500;
-    const height = isMobile ? window.innerHeight * 0.7 : 600;
     
-    // Configure popup options
-    auth.config.popupRedirectResolver._getPopupWindow = function(name, url, width, height) {
-      const top = (window.innerHeight - height) / 2;
-      const left = (window.innerWidth - width) / 2;
-      return window.open(
-        url,
-        name,
-        `width=${width},height=${height},top=${top},left=${left}`
-      );
-    };
-    
+    // Open the popup without trying to customize it
     console.log("Opening sign-in popup");
     const result = await signInWithPopup(auth, provider);
     console.log("Sign-in successful, user:", result.user.email);
