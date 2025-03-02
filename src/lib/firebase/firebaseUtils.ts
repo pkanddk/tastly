@@ -43,10 +43,22 @@ export const signInWithGoogle = async () => {
     
     console.log("Starting Google sign-in process");
     
-    // Use signInWithPopup for all devices
-    const result = await signInWithPopup(auth, provider);
-    console.log("Sign-in successful");
-    return true;
+    // Check if we're on a mobile device
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // For mobile, use redirect method
+      console.log("Using redirect for mobile sign-in");
+      await signInWithRedirect(auth, provider);
+      // This line won't execute due to redirect
+      return true;
+    } else {
+      // For desktop, use popup
+      console.log("Using popup for desktop sign-in");
+      const result = await signInWithPopup(auth, provider);
+      console.log("Sign-in successful");
+      return true;
+    }
   } catch (error) {
     console.error('Error signing in with Google:', error);
     

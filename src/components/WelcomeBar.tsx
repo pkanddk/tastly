@@ -2,16 +2,19 @@
 
 import { useAuth } from '@/lib/hooks/useAuth';
 import Link from 'next/link';
-import { signInWithGoogle, signOut } from '@/lib/firebase/firebaseUtils';
+import { signOut, signInWithGoogle } from '@/lib/firebase/firebaseUtils';
 import { useEffect, useState } from 'react';
+import MobileSignIn from './MobileSignIn';
 
 export default function WelcomeBar() {
   const { user, loading } = useAuth();
   const [mounted, setMounted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   // This ensures the component is only rendered client-side
   useEffect(() => {
     setMounted(true);
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
   }, []);
   
   // Don't render anything during SSR or loading
@@ -50,7 +53,6 @@ export default function WelcomeBar() {
               </Link>
             </div>
           ) : (
-            // Empty span instead of "Not signed in"
             <span></span>
           )}
         </div>
@@ -64,21 +66,25 @@ export default function WelcomeBar() {
               Sign Out
             </button>
           ) : (
-            <button
-              onClick={() => {
-                console.log("Sign in button clicked");
-                signInWithGoogle()
-                  .then(success => console.log("Sign in result:", success))
-                  .catch(error => console.error("Sign in error:", error));
-              }}
-              type="button"
-              className="text-sm text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 px-3 py-1.5 rounded transition-colors flex items-center gap-2 touch-manipulation"
-            >
-              <svg className="w-4 h-4 pointer-events-none" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
-              </svg>
-              <span className="pointer-events-none">Sign In</span>
-            </button>
+            isMobile ? (
+              <MobileSignIn />
+            ) : (
+              <button
+                onClick={() => {
+                  console.log("Desktop sign in button clicked");
+                  signInWithGoogle()
+                    .then(success => console.log("Sign in result:", success))
+                    .catch(error => console.error("Sign in error:", error));
+                }}
+                type="button"
+                className="text-sm text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 px-3 py-1.5 rounded transition-colors flex items-center gap-2 touch-manipulation"
+              >
+                <svg className="w-4 h-4 pointer-events-none" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+                </svg>
+                <span className="pointer-events-none">Sign In</span>
+              </button>
+            )
           )}
         </div>
       </div>
