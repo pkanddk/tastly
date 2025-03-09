@@ -36,12 +36,13 @@ export async function extractRecipeFromUrl(url: string) {
   }
 }
 
+// This should be a server-side function, not client-side
 export async function extractRecipeFromUrlMobile(url: string) {
   try {
     console.log("Mobile extraction for URL:", url);
     
-    // Make a direct fetch to the DeepSeek API
-    const response = await fetch(process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com', {
+    // Use the same extraction logic as the desktop version, but with a simpler prompt
+    const response = await fetch(process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -52,14 +53,17 @@ export async function extractRecipeFromUrlMobile(url: string) {
         messages: [
           {
             role: "system",
-            content: "You are a helpful assistant that extracts recipe information from URLs."
+            content: `You are a helpful assistant that extracts recipe information from URLs. 
+            Extract the recipe in a simple format with title, ingredients, and instructions.
+            If you can't access the URL directly, respond with "I couldn't access this recipe."
+            Keep your response concise and focused on the recipe details only.`
           },
           {
             role: "user",
-            content: `Extract the recipe from this URL: ${url}. Return the recipe in plain text format.`
+            content: `Extract the recipe from this URL: ${url}`
           }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 4000
       })
     });

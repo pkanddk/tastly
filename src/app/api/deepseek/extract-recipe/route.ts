@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractRecipeFromUrl, extractRecipeFromUrlMobile } from '@/app/lib/deepseek';
+import { extractRecipeWithAI } from '@/app/lib/server/recipeExtractor';
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,73 +57,51 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    if (isMobile) {
-      console.log("Processing mobile request differently");
+    try {
+      // Use the new extraction function
+      const recipeData = await extractRecipeWithAI(validatedUrl, !!isMobile);
       
-      try {
-        // Try the mobile-specific extraction first
-        try {
-          const recipeText = await extractRecipeFromUrlMobile(validatedUrl);
-          
-          return new NextResponse(recipeText, {
-            headers: {
-              'Content-Type': 'text/plain'
-            }
-          });
-        } catch (mobileError) {
-          console.error("Mobile extraction failed, trying fallback:", mobileError);
-          
-          // Fallback to a simpler approach
-          const fallbackRecipe = `
+      // For mobile, always return as plain text
+      if (isMobile) {
+        return new NextResponse(
+          typeof recipeData === 'string' ? recipeData : JSON.stringify(recipeData, null, 2),
+          { headers: { 'Content-Type': 'text/plain' } }
+        );
+      }
+      
+      // For desktop, return JSON if it's an object, otherwise plain text
+      if (typeof recipeData === 'object') {
+        return NextResponse.json(recipeData);
+      } else {
+        return new NextResponse(recipeData, {
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      }
+    } catch (error) {
+      console.error("Extraction error:", error);
+      
+      // Provide a fallback for failed extractions
+      if (isMobile) {
+        return new NextResponse(`
 Recipe from: ${validatedUrl}
 
 We couldn't extract the full recipe details automatically.
 Please visit the original website for the complete recipe.
 
-You can try again with a different URL or check our other features.
-          `;
-          
-          return new NextResponse(fallbackRecipe, {
-            headers: {
-              'Content-Type': 'text/plain'
-            }
-          });
-        }
-      } catch (error) {
-        console.error("All mobile extraction attempts failed:", error);
-        
-        // Return a more detailed error for debugging
-        return NextResponse.json(
-          { 
-            error: error instanceof Error ? error.message : 'An unknown error occurred',
-            stack: error instanceof Error ? error.stack : undefined,
-            url: validatedUrl
-          },
-          { status: 500 }
-        );
+Error: ${error instanceof Error ? error.message : 'Unknown error'}
+        `, {
+          headers: { 'Content-Type': 'text/plain' }
+        });
       }
+      
+      return NextResponse.json(
+        { 
+          error: error instanceof Error ? error.message : 'An unknown error occurred',
+          url: validatedUrl
+        },
+        { status: 500 }
+      );
     }
-    
-    // Regular processing for desktop
-    console.log("Extracting recipe from URL:", validatedUrl);
-    const recipeMarkdown = await extractRecipeFromUrl(validatedUrl);
-    console.log("Recipe extraction result type:", typeof recipeMarkdown);
-    console.log("Recipe extraction result preview:", 
-      typeof recipeMarkdown === 'string' 
-        ? recipeMarkdown.substring(0, 100) 
-        : JSON.stringify(recipeMarkdown).substring(0, 100));
-    
-    // If returning JSON
-    if (typeof recipeMarkdown === 'object') {
-      return NextResponse.json(recipeMarkdown);
-    }
-
-    // If returning plain text
-    return new NextResponse(recipeMarkdown, {
-      headers: {
-        'Content-Type': 'text/plain'
-      }
-    });
   } catch (error) {
     console.error('Error in extract-recipe API route:', error);
     return NextResponse.json(
