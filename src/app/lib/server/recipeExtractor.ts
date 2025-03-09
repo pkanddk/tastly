@@ -2,6 +2,10 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
 
+// Simple in-memory cache
+const recipeCache = new Map<string, { data: any, timestamp: number }>();
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
 // Function to fetch the HTML content of a URL
 async function fetchHtml(url: string): Promise<string> {
   try {
@@ -25,6 +29,16 @@ async function fetchHtml(url: string): Promise<string> {
 // Function to extract recipe data using DeepSeek API
 export async function extractRecipeWithAI(url: string, isMobile: boolean = false) {
   try {
+    // Generate a cache key based on the URL and device type
+    const cacheKey = `${url}:${isMobile ? 'mobile' : 'desktop'}`;
+    
+    // Check if we have a cached result that's not expired
+    const cachedItem = recipeCache.get(cacheKey);
+    if (cachedItem && (Date.now() - cachedItem.timestamp) < CACHE_TTL) {
+      console.log("Using cached recipe for:", url);
+      return cachedItem.data;
+    }
+    
     // First, try to fetch the HTML content
     const html = await fetchHtml(url);
     
@@ -33,8 +47,14 @@ export async function extractRecipeWithAI(url: string, isMobile: boolean = false
     const title = $('title').text();
     const metaDescription = $('meta[name="description"]').attr('content') || '';
     
-    // Extract visible text from the page (simplified)
-    const bodyText = $('body').text().replace(/\s+/g, ' ').trim().substring(0, 5000);
+    // Look for recipe-specific content first
+    const recipeContent = $('.recipe, .recipe-content, .ingredients, .instructions, article, .post-content, .entry-content')
+      .map((_, el) => $(el).text())
+      .get()
+      .join(' ');
+    
+    // If no recipe-specific content found, use a smaller portion of the body text
+    const bodyText = recipeContent || $('body').text().replace(/\s+/g, ' ').trim().substring(0, 3000); // Reduced from 5000
     
     // Now use DeepSeek API to extract the recipe
     const apiUrl = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
@@ -44,10 +64,10 @@ export async function extractRecipeWithAI(url: string, isMobile: boolean = false
       throw new Error('DeepSeek API key is not configured');
     }
     
-    // Create a prompt based on the extracted information
+    // Create a more focused prompt based on the extracted information
     const prompt = isMobile 
-      ? `Extract the recipe from this webpage with title "${title}". Here's the meta description: "${metaDescription}". Extract the ingredients and instructions in a simple format.`
-      : `Extract the recipe from this webpage with title "${title}". Here's the meta description: "${metaDescription}". Extract the title, description, ingredients, instructions, and any other relevant information like cooking time, servings, etc.`;
+      ? `Extract the recipe from this webpage with title "${title}". Focus only on the ingredients and instructions in a simple format.`
+      : `Extract the recipe from this webpage with title "${title}". Extract only the title, ingredients (as a list), and instructions (as steps).`;
     
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -65,11 +85,11 @@ export async function extractRecipeWithAI(url: string, isMobile: boolean = false
           },
           {
             role: "user",
-            content: `${prompt}\n\nHere's some of the page content: ${bodyText}`
+            content: `${prompt}\n\nHere's the content: ${bodyText}`
           }
         ],
-        temperature: isMobile ? 0.3 : 0.7,
-        max_tokens: 4000
+        temperature: 0.3, // Reduced from 0.7 for more consistent results
+        max_tokens: 2000 // Reduced from 4000 to speed up response
       })
     });
     
@@ -80,6 +100,12 @@ export async function extractRecipeWithAI(url: string, isMobile: boolean = false
     
     const data = await response.json();
     const content = data.choices[0].message.content;
+    
+    // Cache the result before returning
+    recipeCache.set(cacheKey, { 
+      data: content, 
+      timestamp: Date.now() 
+    });
     
     // For mobile, return the content as is
     if (isMobile) {

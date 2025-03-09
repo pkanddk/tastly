@@ -58,24 +58,46 @@ export async function POST(request: NextRequest) {
     }
     
     try {
-      // Use the new extraction function
-      const recipeData = await extractRecipeWithAI(validatedUrl, !!isMobile);
+      // Use the new extraction function with a timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
       
-      // For mobile, always return as plain text
-      if (isMobile) {
-        return new NextResponse(
-          typeof recipeData === 'string' ? recipeData : JSON.stringify(recipeData, null, 2),
-          { headers: { 'Content-Type': 'text/plain' } }
-        );
-      }
-      
-      // For desktop, return JSON if it's an object, otherwise plain text
-      if (typeof recipeData === 'object') {
-        return NextResponse.json(recipeData);
-      } else {
-        return new NextResponse(recipeData, {
-          headers: { 'Content-Type': 'text/plain' }
-        });
+      try {
+        const recipeData = await extractRecipeWithAI(validatedUrl, !!isMobile);
+        clearTimeout(timeoutId);
+        
+        // For mobile, always return as plain text
+        if (isMobile) {
+          return new NextResponse(
+            typeof recipeData === 'string' ? recipeData : JSON.stringify(recipeData, null, 2),
+            { headers: { 'Content-Type': 'text/plain' } }
+          );
+        }
+        
+        // For desktop, return JSON if it's an object, otherwise plain text
+        if (typeof recipeData === 'object') {
+          return NextResponse.json(recipeData);
+        } else {
+          return new NextResponse(recipeData, {
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        }
+      } catch (abortError) {
+        if (abortError.name === 'AbortError') {
+          console.error("Extraction timed out");
+          // Return a timeout-specific message
+          if (isMobile) {
+            return new NextResponse(`
+Recipe from: ${validatedUrl}
+
+The recipe extraction is taking longer than expected.
+Please try again or visit the original website for the recipe.
+            `, {
+              headers: { 'Content-Type': 'text/plain' }
+            });
+          }
+        }
+        throw abortError; // Re-throw other errors
       }
     } catch (error) {
       console.error("Extraction error:", error);

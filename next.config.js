@@ -10,6 +10,7 @@ const nextConfig = {
         pathname: '**',
       },
     ],
+    domains: ['firebasestorage.googleapis.com'],
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -32,6 +33,11 @@ const nextConfig = {
     serverComponentsExternalPackages: ['puppeteer-core'],
     serverActions: {
       bodySizeLimit: '10mb',
+    },
+  },
+  functions: {
+    'api/deepseek/extract-recipe': {
+      maxDuration: 60,
     },
   },
 };
