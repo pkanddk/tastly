@@ -24,12 +24,13 @@ import {
   where,
   setDoc,
   serverTimestamp,
-  limit
+  limit,
+  orderBy
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-// Add this near the top of the file
-export const DEFAULT_RECIPE_IMAGE = "/images/banner.jpg";
+// Update the default recipe image path
+export const DEFAULT_RECIPE_IMAGE = '/images/tastly-banner.jpg';
 
 // Auth functions
 export const signOut = async (callback?: () => void) => {
@@ -52,58 +53,26 @@ export const signOut = async (callback?: () => void) => {
 
 export const signInWithGoogle = async () => {
   try {
-    console.log("Starting Google sign-in process");
     const provider = new GoogleAuthProvider();
+    // Add this line to prefer popup mode
+    provider.setCustomParameters({ prompt: 'select_account' });
     
-    // Add these parameters to improve compatibility
-    provider.setCustomParameters({
-      prompt: 'select_account'
-    });
-    
-    // Always use popup for simplicity
-    console.log("Using popup for sign-in on all devices");
-    
-    // Set persistence to LOCAL to survive page reloads
-    // Use indexedDBLocalPersistence for better mobile support
-    try {
-      console.log("Setting persistence to indexedDBLocalPersistence");
-      await setPersistence(auth, indexedDBLocalPersistence);
-      console.log("Persistence set successfully");
-    } catch (persistError) {
-      console.error("Error setting persistence:", persistError);
-      // Fall back to browserLocalPersistence
-      try {
-        console.log("Falling back to browserLocalPersistence");
-        await setPersistence(auth, browserLocalPersistence);
-      } catch (fallbackError) {
-        console.error("Error setting fallback persistence:", fallbackError);
-      }
-    }
-    
-    // Check if we're on a mobile device
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    // Open the popup without trying to customize it
-    console.log("Opening sign-in popup");
-    const result = await signInWithPopup(auth, provider);
-    console.log("Sign-in successful, user:", result.user.email);
-    
-    // Force a page reload to ensure the auth state is recognized
-    if (isMobile) {
-      console.log("Mobile device detected, reloading page to refresh auth state");
-      window.location.reload();
-    }
-    
-    return true;
+    // Use signInWithPopup with error handling
+    const result = await signInWithPopup(auth, provider)
+      .catch((error) => {
+        console.error("Popup sign-in error:", error);
+        // Fallback to redirect method if popup fails
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+          console.log("Popup was blocked or closed, trying redirect method");
+          return signInWithRedirect(auth, provider);
+        }
+        throw error;
+      });
+      
+    return result;
   } catch (error) {
-    console.error('Error signing in with Google:', error);
-    
-    // Log specific error codes to help with debugging
-    if (error.code) {
-      console.error('Error code:', error.code);
-    }
-    
-    return false;
+    console.error("Error signing in with Google:", error);
+    throw error;
   }
 };
 
@@ -277,51 +246,36 @@ export const getRecipeById = async (recipeId: string) => {
   }
 };
 
-export const cacheRecipeUrl = async (url: string, recipeData: any) => {
+export async function getRecipeFromCache(url: string): Promise<string | null> {
   try {
-    // Create a hash of the URL to use as a key
-    const urlHash = await createHash(url);
+    const q = query(collection(db, 'recipesCache'), where('url', '==', url));
+    const querySnapshot = await getDocs(q);
     
-    // Store in Firestore with TTL of 7 days
-    const cacheRef = doc(db, 'recipe_cache', urlHash);
-    await setDoc(cacheRef, {
-      url,
-      recipeData,
-      timestamp: serverTimestamp(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-    });
-    
-    return true;
-  } catch (error) {
-    console.error('Error caching recipe:', error);
-    return false;
-  }
-};
-
-export const getRecipeFromCache = async (url: string) => {
-  try {
-    const urlHash = await createHash(url);
-    const cacheRef = doc(db, 'recipe_cache', urlHash);
-    const docSnap = await getDoc(cacheRef);
-    
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      
-      // Check if cache has expired
-      if (data.expiresAt && data.expiresAt.toDate() > new Date()) {
-        return data.recipeData;
-      }
-      
-      // Cache expired, delete it
-      await deleteDoc(cacheRef);
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return doc.data().content;
     }
     
     return null;
   } catch (error) {
     console.error('Error getting cached recipe:', error);
+    // Just return null and don't let the error affect the user experience
     return null;
   }
-};
+}
+
+export async function cacheRecipeUrl(url: string, content: string): Promise<void> {
+  try {
+    await addDoc(collection(db, 'recipesCache'), {
+      url,
+      content,
+      timestamp: new Date().getTime()
+    });
+  } catch (error) {
+    console.error('Error caching recipe:', error);
+    // Silently fail - don't let caching errors affect the user experience
+  }
+}
 
 // Helper function to create a hash of a string
 const createHash = async (text: string) => {
@@ -350,5 +304,71 @@ export const checkIfRecipeSaved = async (userId: string, title: string): Promise
   } catch (error) {
     console.error('Error checking if recipe is saved:', error);
     return false;
+  }
+};
+
+/**
+ * Save a replica recipe to Firestore
+ */
+export const saveReplicaRecipe = async (userId: string, recipeData: any) => {
+  try {
+    const recipesRef = collection(db, 'replicaRecipes');
+    const newRecipe = {
+      ...recipeData,
+      userId,
+      createdAt: serverTimestamp(),
+    };
+    
+    const docRef = await addDoc(recipesRef, newRecipe);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error saving replica recipe:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all replica recipes
+ */
+export const getAllReplicaRecipes = async () => {
+  try {
+    const recipesRef = collection(db, 'replicaRecipes');
+    const q = query(recipesRef, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    
+    const recipes: any[] = [];
+    querySnapshot.forEach((doc) => {
+      recipes.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    return recipes;
+  } catch (error) {
+    console.error('Error getting replica recipes:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a replica recipe by ID
+ */
+export const getReplicaRecipeById = async (recipeId: string) => {
+  try {
+    const docRef = doc(db, 'replicaRecipes', recipeId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data()
+      };
+    } else {
+      return null;
+    }
+  } catch (error) {
+    console.error('Error getting replica recipe:', error);
+    throw error;
   }
 };

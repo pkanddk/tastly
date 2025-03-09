@@ -76,30 +76,65 @@ export default function RecipeExtractorClient() {
               body: JSON.stringify({ url }),
             });
 
-            const data = await response.json();
-            
             if (!response.ok) {
-              throw new Error(data.error || 'Failed to extract recipe');
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Failed to extract recipe');
             }
 
-            // Extract the markdown content from the response
-            let extractedRecipe = data.markdown || data.content || data;
+            // Check if the response is a stream or JSON
+            const contentType = response.headers.get('content-type');
             
-            // Cache the recipe for future use
-            cacheRecipeUrl(url, extractedRecipe);
-            
-            // Process the recipe data
-            if (typeof extractedRecipe === 'string') {
-              extractedRecipe = extractedRecipe.replace(/^```markdown\s*/i, '');
-              extractedRecipe = extractedRecipe.replace(/\s*```\s*$/i, '');
-              extractedRecipe = extractedRecipe.replace(/^markdown\s*/i, '');
+            if (contentType && contentType.includes('text/event-stream')) {
+              // Handle streaming response
+              const reader = response.body?.getReader();
+              if (!reader) {
+                throw new Error('Failed to get reader from response');
+              }
+              
+              let extractedRecipe = '';
+              
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                // Convert the chunk to text and append to the recipe
+                const chunk = new TextDecoder().decode(value);
+                extractedRecipe += chunk;
+              }
+              
+              // Cache the recipe for future use
+              cacheRecipeUrl(url, extractedRecipe);
+              
+              setRecipe(extractedRecipe);
+              fetchImage(url);
+              resolve(extractedRecipe);
+            } else {
+              // Handle JSON response
+              const data = await response.json();
+              
+              // Extract the markdown content from the response
+              let extractedRecipe = data.markdown || data.content || data;
+              
+              // If we still have markdown tags, try processing the original
+              if (typeof extractedRecipe === 'string' && 
+                  (extractedRecipe.includes('```') || extractedRecipe.includes("'''"))) {
+                if (data.original) {
+                  extractedRecipe = processRecipeResponse(data.original);
+                }
+              }
+              
+              // Cache the recipe for future use
+              cacheRecipeUrl(url, extractedRecipe);
+              
+              // Process the recipe data
+              if (typeof extractedRecipe === 'string') {
+                extractedRecipe = processRecipeResponse(extractedRecipe);
+              }
+              
+              setRecipe(extractedRecipe);
+              fetchImage(url);
+              resolve(extractedRecipe);
             }
-            
-            setRecipe(extractedRecipe);
-            
-            // Fetch image
-            fetchImage(url);
-            resolve(extractedRecipe);
           }
         } catch (error) {
           reject(error);
@@ -108,15 +143,15 @@ export default function RecipeExtractorClient() {
       
       // Set a timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Recipe extraction timed out')), 30000);
+        setTimeout(() => reject(new Error('Recipe extraction timed out')), 60000); // 60 seconds
       });
       
       // Race the extraction against the timeout
       await Promise.race([extractionPromise, timeoutPromise]);
       
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Extraction error:', err);
-      setError(`Failed to extract recipe: ${err.message || 'Please try a different URL'}`);
+      setError(`Failed to extract recipe: ${err instanceof Error ? err.message : 'Please try a different URL'}`);
     } finally {
       setLoading(false);
     }
@@ -145,22 +180,30 @@ export default function RecipeExtractorClient() {
     }
   };
 
+  // Add this function to directly handle the specific pattern we're seeing
+  const handleRecipeMarkdown = (recipe: string) => {
+    // Check if the recipe starts with ```markdown
+    if (recipe.startsWith('```markdown')) {
+      // Remove the ```markdown at the beginning
+      return recipe.replace(/^```markdown\s*/i, '');
+    }
+    return recipe;
+  };
+
+  // Update the formatRecipe function to use this direct handler
   const formatRecipe = (recipe: any) => {
     if (!recipe) return null;
+
+    // First, directly handle the markdown pattern
+    if (typeof recipe === 'string') {
+      recipe = handleRecipeMarkdown(recipe);
+    }
 
     try {
       return <RecipeDisplay recipe={recipe} recipeImage={recipeImage || DEFAULT_RECIPE_IMAGE} />;
     } catch (error) {
       // If parsing fails, display as formatted text
-      // Remove any markdown delimiters
       let recipeText = typeof recipe === 'string' ? recipe : JSON.stringify(recipe, null, 2);
-      
-      // Remove ```markdown at the beginning
-      recipeText = recipeText.replace(/^```markdown\s*/i, '');
-      // Remove ``` at the end
-      recipeText = recipeText.replace(/\s*```\s*$/i, '');
-      // Remove any "markdown" text at the beginning
-      recipeText = recipeText.replace(/^markdown\s*/i, '');
       
       // Convert markdown to HTML for better display
       const formattedText = formatMarkdown(recipeText);
@@ -169,11 +212,11 @@ export default function RecipeExtractorClient() {
         <div className="custom-recipe-container bg-gray-900 rounded-xl shadow-lg mb-8">
           <div className="recipe-image-container rounded-t-xl overflow-hidden relative h-64 w-full">
             <Image 
-              src={recipeImage || DEFAULT_RECIPE_IMAGE} 
-              alt="Recipe image" 
+              src={recipeImage || DEFAULT_RECIPE_IMAGE}
+              alt="Recipe image"
               fill
-              className="object-cover"
               sizes="(max-width: 768px) 100vw, 768px"
+              className="object-cover"
             />
           </div>
           <div className="p-5 prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: formattedText }} />
@@ -182,10 +225,22 @@ export default function RecipeExtractorClient() {
     }
   };
   
-  // Simple markdown formatter
+  // Simple markdown formatter with additional cleanup
   const formatMarkdown = (text: string) => {
+    // First, clean up any markdown formatting tags that might be visible in the output
+    let cleanedText = text;
+    
+    // Remove '''markdown at the beginning of the text
+    cleanedText = cleanedText.replace(/^'''markdown\s*/i, '');
+    
+    // Remove ```markdown at the beginning of the text
+    cleanedText = cleanedText.replace(/^```markdown\s*/i, '');
+    
+    // Remove ''' at the end of the text
+    cleanedText = cleanedText.replace(/'''\s*$/i, '');
+    
     // Replace headers
-    let formatted = text
+    let formatted = cleanedText
       .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold my-4">$1</h1>')
       .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold my-3 text-blue-400">$1</h2>')
       .replace(/^### (.*$)/gim, '<h3 class="text-lg font-medium my-2">$1</h3>')
@@ -203,49 +258,108 @@ export default function RecipeExtractorClient() {
       .replace(/<\/ul>\s*<ul class="list-disc pl-5 my-2">/g, '')
       .replace(/<\/ol>\s*<ol class="list-decimal pl-5 my-2">/g, '');
     
+    // Final cleanup - remove any remaining markdown tags that might be visible
+    formatted = formatted
+      .replace(/```markdown/g, '')
+      .replace(/```/g, '')
+      .replace(/'''/g, '');
+    
     return formatted;
+  };
+
+  // Add this specific fix for the exact pattern you're seeing
+  const fixSpecificMarkdownPattern = (text: string) => {
+    // Check for the specific pattern: ```markdown at start and ''' at end
+    const specificPattern = /^```markdown\s*([\s\S]*?)'''\s*$/;
+    const match = text.match(specificPattern);
+    
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    
+    return text;
+  };
+
+  // Update the cleanMarkdownFormatting function to include this specific fix
+  const cleanMarkdownFormatting = (text: string) => {
+    if (!text) return '';
+    
+    // First try the specific pattern fix
+    const specificFix = fixSpecificMarkdownPattern(text);
+    if (specificFix !== text) {
+      return specificFix;
+    }
+    
+    // Then try the other patterns...
+    // First check if the text starts with ```markdown and ends with ```
+    const fullMarkdownBlockRegex = /^```markdown\s*([\s\S]*?)\s*```$/;
+    const match = text.match(fullMarkdownBlockRegex);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+    
+    // Check for other code block patterns
+    const codeBlockRegex = /^```(?:[\w]*\s*)?\n?([\s\S]*?)\n?```$/;
+    const codeMatch = text.match(codeBlockRegex);
+    if (codeMatch && codeMatch[1]) {
+      return codeMatch[1].trim();
+    }
+    
+    // Check for triple quote pattern
+    const tripleQuoteRegex = /^'''(?:[\w]*\s*)?\n?([\s\S]*?)\n?'''$/;
+    const quoteMatch = text.match(tripleQuoteRegex);
+    if (quoteMatch && quoteMatch[1]) {
+      return quoteMatch[1].trim();
+    }
+    
+    // If no full block matches, clean up any markdown tags
+    return text
+      .replace(/```markdown\s*/g, '')
+      .replace(/```\s*/g, '')
+      .replace(/'''\s*/g, '')
+      .replace(/^markdown\s*/g, '')
+      .trim();
+  };
+
+  // Add a direct pattern match for the specific issue we're seeing
+  const fixTripleQuotePattern = (text: string) => {
+    // Check for text that starts with ```markdown and contains ''' anywhere
+    if (text.startsWith('```markdown') && text.includes("'''")) {
+      // Remove the ```markdown at the beginning
+      let fixed = text.replace(/^```markdown\s*/i, '');
+      
+      // Remove the ''' at the end or anywhere in the text
+      fixed = fixed.replace(/'''/g, '');
+      
+      return fixed.trim();
+    }
+    
+    // Also check for just '''markdown at the beginning
+    if (text.startsWith("'''markdown")) {
+      let fixed = text.replace(/^'''markdown\s*/i, '');
+      return fixed.trim();
+    }
+    
+    return text;
+  };
+
+  // Update the processRecipeResponse function to use this direct fix first
+  const processRecipeResponse = (response: string) => {
+    if (!response) return '';
+    
+    // First try the direct pattern match
+    let cleaned = fixTripleQuotePattern(response);
+    
+    // If that didn't change anything, try the other cleaning methods
+    if (cleaned === response) {
+      cleaned = cleanMarkdownFormatting(response);
+    }
+    
+    return cleaned;
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <style jsx>{`
-        .custom-recipe-container {
-          display: grid;
-          grid-gap: 16px;
-        }
-        
-        .custom-recipe-container h1 {
-          margin: 0 0 8px 0;
-        }
-        
-        .custom-recipe-container .recipe-meta {
-          margin: 0 0 16px 0;
-        }
-        
-        .ingredient-section, .instruction-section {
-          display: grid;
-          grid-gap: 8px;
-        }
-        
-        .ingredient-list {
-          display: grid;
-          grid-gap: 4px;
-        }
-        
-        .instruction-list {
-          display: grid;
-          grid-gap: 8px;
-        }
-        
-        .section-header {
-          margin: 16px 0 4px 0;
-        }
-        
-        .subsection-header {
-          margin: 8px 0 2px 0;
-        }
-      `}</style>
-      
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-center mb-6">Recipe Extractor</h1>
         
@@ -282,4 +396,4 @@ export default function RecipeExtractorClient() {
       ) : null}
     </div>
   );
-} 
+}

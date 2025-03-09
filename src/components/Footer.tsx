@@ -23,6 +23,12 @@ export default function Footer() {
             extract
           </Link>
           <Link 
+            href="/replication-station" 
+            className={`text-sm transition-colors ${pathname === '/replication-station' ? 'text-blue-400' : 'text-gray-400 hover:text-white'}`}
+          >
+            replication station
+          </Link>
+          <Link 
             href="/my-recipes" 
             className={`text-sm transition-colors ${pathname === '/my-recipes' ? 'text-blue-400' : 'text-gray-400 hover:text-white'}`}
           >

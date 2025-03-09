@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { OpenAIStream, StreamingTextResponse } from 'ai';
+import OpenAI from 'openai';
 
-// Don't import from deepseek.ts to avoid circular dependency
+// Initialize OpenAI client with the Deepseek API
+const openai = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY || '',
+  baseURL: 'https://api.deepseek.com/v1',
+});
+
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
@@ -31,77 +38,64 @@ export async function POST(req: NextRequest) {
     
     const html = await response.text();
     
-    // Use Cheerio to parse the HTML and extract the recipe
+    // Use Cheerio to parse the HTML
     const $ = cheerio.load(html);
     
-    // Try to extract structured data first (preferred method)
-    const jsonLdScripts = $('script[type="application/ld+json"]');
-    let foundRecipe = false;
+    // Remove script tags, style tags, and comments to clean up the HTML
+    $('script, style, comment').remove();
     
-    for (let i = 0; i < jsonLdScripts.length; i++) {
-      try {
-        const script = jsonLdScripts[i];
-        const jsonContent = JSON.parse($(script).html() || '{}');
-        
-        // Check if this is a recipe schema
-        if (jsonContent['@type'] === 'Recipe' || 
-            (Array.isArray(jsonContent['@graph']) && 
-             jsonContent['@graph'].some((item: any) => item['@type'] === 'Recipe'))) {
-          
-          // Found recipe data, convert to markdown
-          const recipeData = Array.isArray(jsonContent['@graph']) 
-            ? jsonContent['@graph'].find((item: any) => item['@type'] === 'Recipe')
-            : jsonContent;
-            
-          // Convert structured data to markdown for consistent display
-          const markdown = convertStructuredRecipeToMarkdown(recipeData);
-          
-          // Return the markdown
-          foundRecipe = true;
-          return NextResponse.json({ markdown });
+    // Get the page title
+    const title = $('title').text() || $('h1').first().text() || 'Recipe';
+    
+    // Extract the main content
+    const bodyContent = $('body').text();
+    
+    // Prepare the prompt for Deepseek
+    const prompt = `
+    You are a helpful assistant that extracts recipes from web pages. I'll provide you with the HTML content of a recipe page, and I need you to extract the recipe in a clean, structured markdown format.
+
+    Please include:
+    - Recipe title as a level 1 heading
+    - Ingredients as a bulleted list under a level 2 "Ingredients" heading
+    - Instructions as a numbered list under a level 2 "Instructions" heading
+    - Cooking time and servings information under a level 2 "Cooking Time and Servings" heading
+    - Any notes or tips under a level 2 "Notes" heading
+
+    Format the recipe in clean markdown. Don't include any explanations or commentary outside the recipe itself.
+
+    Here's the content from the page with title "${title}":
+
+    ${bodyContent.substring(0, 15000)} // Limit content to avoid token limits
+    `;
+    
+    // Use OpenAI with Deepseek API to extract the recipe
+    const completion = await openai.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that extracts recipes from web pages and formats them in clean markdown. DO NOT wrap your response in markdown code blocks (```). DO NOT use triple backticks or triple quotes at all. Just provide the clean markdown content directly."
+        },
+        {
+          role: "user",
+          content: prompt
         }
-      } catch (e) {
-        // Continue to next script if parsing fails
-        console.error('Error parsing JSON-LD script:', e);
-      }
-    }
+      ],
+      temperature: 0,
+      max_tokens: 4000,
+      stream: false,
+    });
     
-    // If no structured data found, try to extract from HTML
-    if (!foundRecipe) {
-      // Look for common recipe containers
-      const recipeContainers = [
-        '.recipe-content',
-        '.recipe',
-        '.recipe-container',
-        '[itemtype="http://schema.org/Recipe"]',
-        '.wprm-recipe',
-        '.tasty-recipes',
-        '.recipe-card',
-        // Add more selectors as needed
-      ];
-      
-      let recipeContent = '';
-      
-      for (const selector of recipeContainers) {
-        if ($(selector).length) {
-          recipeContent = $(selector).html() || '';
-          break;
-        }
-      }
-      
-      // If we found HTML content, convert it to markdown
-      if (recipeContent) {
-        // Extract title
-        const title = $('h1').first().text() || $('title').text() || 'Recipe';
-        
-        // Basic HTML to markdown conversion
-        const markdown = `# ${title}\n\n${convertHtmlToMarkdown(recipeContent)}`;
-        return NextResponse.json({ markdown });
-      }
-    }
-    
-    // If we still don't have recipe content, return an error
-    return NextResponse.json({ error: 'Could not extract recipe from the provided URL' }, { status: 400 });
+    // Return the extracted recipe as JSON
+    const recipeContent = completion.choices[0].message.content || '';
+
+    // Direct fix for the specific pattern
+    const cleanedContent = recipeContent.replace(/^```markdown\s*/i, '');
+
+    return NextResponse.json({ 
+      markdown: cleanedContent,
+      original: recipeContent
+    });
     
   } catch (error: any) {
     console.error('Recipe extraction error:', error);
@@ -112,145 +106,4 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json({ error: error.message || 'Failed to extract recipe' }, { status: 500 });
   }
-}
-
-// Helper function to convert HTML to markdown
-function convertHtmlToMarkdown(html: string): string {
-  const $ = cheerio.load(html);
-  let markdown = '';
-  
-  // Extract ingredients
-  const ingredients = $('.ingredients, .recipe-ingredients, .wprm-recipe-ingredients')
-    .find('li')
-    .map((i, el) => $(el).text().trim())
-    .get();
-  
-  if (ingredients.length > 0) {
-    markdown += '## Ingredients\n\n';
-    ingredients.forEach(ingredient => {
-      markdown += `- ${ingredient}\n`;
-    });
-    markdown += '\n';
-  }
-  
-  // Extract instructions
-  const instructions = $('.instructions, .recipe-instructions, .wprm-recipe-instructions')
-    .find('li, p')
-    .map((i, el) => $(el).text().trim())
-    .get();
-  
-  if (instructions.length > 0) {
-    markdown += '## Instructions\n\n';
-    instructions.forEach((instruction, index) => {
-      markdown += `${index + 1}. ${instruction}\n`;
-    });
-    markdown += '\n';
-  }
-  
-  // If we couldn't extract structured content, just convert the HTML to text
-  if (markdown.trim() === '') {
-    // Remove scripts and styles
-    $('script, style').remove();
-    
-    // Get text content
-    const text = $('body').text().trim()
-      .replace(/\s+/g, ' ')
-      .replace(/\n+/g, '\n\n');
-    
-    markdown = text;
-  }
-  
-  return markdown;
-}
-
-// Helper function to convert structured recipe data to markdown
-function convertStructuredRecipeToMarkdown(recipe) {
-  let markdown = '';
-  
-  // Add title
-  if (recipe.name) {
-    markdown += `# ${recipe.name}\n\n`;
-  }
-  
-  // Add description
-  if (recipe.description) {
-    markdown += `${recipe.description}\n\n`;
-  }
-  
-  // Add metadata
-  if (recipe.prepTime) {
-    markdown += `Prep Time: ${formatTime(recipe.prepTime)}\n`;
-  }
-  
-  if (recipe.cookTime) {
-    markdown += `Cook Time: ${formatTime(recipe.cookTime)}\n`;
-  }
-  
-  if (recipe.totalTime) {
-    markdown += `Total Time: ${formatTime(recipe.totalTime)}\n`;
-  }
-  
-  if (recipe.recipeYield) {
-    markdown += `Servings: ${recipe.recipeYield}\n`;
-  }
-  
-  markdown += '\n';
-  
-  // Add ingredients
-  if (recipe.recipeIngredient && recipe.recipeIngredient.length > 0) {
-    markdown += `## Ingredients\n\n`;
-    
-    recipe.recipeIngredient.forEach(ingredient => {
-      markdown += `- ${ingredient}\n`;
-    });
-    
-    markdown += '\n';
-  }
-  
-  // Add instructions
-  if (recipe.recipeInstructions) {
-    markdown += `## Instructions\n\n`;
-    
-    if (Array.isArray(recipe.recipeInstructions)) {
-      recipe.recipeInstructions.forEach((instruction, index) => {
-        const step = typeof instruction === 'string' 
-          ? instruction 
-          : instruction.text || '';
-          
-        if (step) {
-          markdown += `${index + 1}. ${step}\n`;
-        }
-      });
-    } else if (typeof recipe.recipeInstructions === 'string') {
-      markdown += recipe.recipeInstructions;
-    }
-    
-    markdown += '\n';
-  }
-  
-  return markdown;
-}
-
-// Helper function to format ISO duration to human readable
-function formatTime(isoTime) {
-  if (!isoTime) return '';
-  
-  // Handle simple minute/hour formats
-  if (isoTime.includes('M') && !isoTime.includes('H')) {
-    const minutes = isoTime.match(/PT(\d+)M/)?.[1];
-    return minutes ? `${minutes} minutes` : isoTime;
-  }
-  
-  if (isoTime.includes('H')) {
-    const hours = isoTime.match(/PT(\d+)H/)?.[1];
-    const minutes = isoTime.match(/(\d+)M/)?.[1];
-    
-    if (hours && minutes) {
-      return `${hours} hours ${minutes} minutes`;
-    } else if (hours) {
-      return `${hours} hours`;
-    }
-  }
-  
-  return isoTime;
 } 

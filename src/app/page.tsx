@@ -49,8 +49,9 @@ export default function HomePage() {
           <div className="relative w-full h-64 sm:h-80 md:h-96 rounded-xl overflow-hidden shadow-2xl">
             <Image
               src="/images/tastly-banner.jpg"
-              alt="Tastly Banner"
+              alt="Banner"
               fill
+              sizes="(max-width: 768px) 100vw, 1200px"
               className="object-cover"
               priority
             />
@@ -74,10 +75,10 @@ export default function HomePage() {
         
         {/* Action Buttons - Show for all users */}
         <div className="flex flex-col items-center mb-12">
-          <div className="flex flex-row flex-wrap justify-center gap-4 w-full max-w-lg">
+          <div className="flex flex-row flex-wrap justify-center gap-4 w-full max-w-xl">
             <Link 
               href="/recipe-extractor" 
-              className="flex-1 min-w-[150px] bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 min-w-[120px] bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -85,10 +86,20 @@ export default function HomePage() {
               Extract New Recipe
             </Link>
             
+            <Link 
+              href="/replication-station" 
+              className="flex-1 min-w-[120px] bg-purple-600 hover:bg-purple-500 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+              Replication Station
+            </Link>
+            
             {user ? (
               <Link 
                 href="/my-recipes" 
-                className="flex-1 min-w-[150px] bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 min-w-[120px] bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -98,7 +109,7 @@ export default function HomePage() {
             ) : (
               <button 
                 onClick={signInWithGoogle}
-                className="flex-1 min-w-[150px] bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 min-w-[120px] bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />

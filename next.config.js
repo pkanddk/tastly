@@ -18,6 +18,9 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   swcMinify: true,
+  async rewrites() {
+    return [];
+  },
 };
 
 module.exports = nextConfig; 

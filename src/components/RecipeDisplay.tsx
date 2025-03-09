@@ -301,18 +301,16 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
     const ingredientsBySection = organizeBySection(allIngredients);
     
     return (
-      <div className="bg-gray-800 rounded-xl overflow-hidden shadow-lg">
-        {/* Recipe Image */}
-        {recipeImage && (
-          <div className="relative h-64 w-full">
-            <Image
-              src={recipeImage}
-              alt={title}
-              fill
-              className="object-cover"
-            />
-          </div>
-        )}
+      <div className="custom-recipe-container bg-gray-900 rounded-xl shadow-lg mb-8">
+        <div className="recipe-image-container rounded-t-xl overflow-hidden relative h-64 w-full">
+          <Image 
+            src={recipeImage}
+            alt="Recipe image"
+            fill
+            sizes="(max-width: 768px) 100vw, 768px"
+            className="object-cover"
+          />
+        </div>
         
         {/* Action Buttons - NEW SECTION */}
         <div className="p-4 bg-gray-700 flex justify-center gap-4">
@@ -464,8 +462,17 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
   
   // If we have a structured recipe object, render it
   return (
-    <div className="bg-gray-800 rounded-xl overflow-hidden shadow-lg">
-      {/* Rest of the component remains the same */}
+    <div className="custom-recipe-container bg-gray-900 rounded-xl shadow-lg mb-8">
+      <div className="recipe-image-container rounded-t-xl overflow-hidden relative h-64 w-full">
+        <Image 
+          src={recipeImage}
+          alt="Recipe image"
+          fill
+          sizes="(max-width: 768px) 100vw, 768px"
+          className="object-cover"
+        />
+      </div>
+      {/* ... rest of the component ... */}
     </div>
   );
 }
