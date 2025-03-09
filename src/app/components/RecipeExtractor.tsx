@@ -53,7 +53,6 @@ export default function RecipeExtractor() {
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [forceMobile, setForceMobile] = useState(false);
 
   useEffect(() => {
     // Reset URL and recipe when component mounts
@@ -111,21 +110,19 @@ export default function RecipeExtractor() {
       }
       
       // Log device info for debugging
-      const isMobileDevice = forceMobile || isMobile();
+      const isMobileDevice = isMobile();
       console.log("Device info:", { isMobile: isMobileDevice, userAgent: navigator.userAgent });
       console.log("Extracting recipe from URL:", cleanUrl);
       
       // Use a fresh object for the request body
       const requestBody = { 
         url: cleanUrl, 
-        isMobile: isMobileDevice,
+        isMobile: isMobileDevice,  // Still send this for analytics/logging
         timestamp: new Date().toISOString()
       };
       
-      // Use different endpoints for mobile and desktop
-      const endpoint = isMobileDevice 
-        ? '/api/extract-recipe-mobile' 
-        : '/api/extract-recipe';
+      // Always use the same endpoint regardless of device
+      const endpoint = '/api/extract-recipe';
       
       console.log("About to fetch from endpoint:", endpoint);
       
@@ -444,15 +441,6 @@ export default function RecipeExtractor() {
           </div>
         </div>
       ) : null}
-
-      <div className="mt-4 text-center">
-        <button 
-          onClick={() => setForceMobile(!forceMobile)}
-          className="text-sm bg-gray-700 text-white px-3 py-1 rounded"
-        >
-          {forceMobile ? "Switch to Desktop Version" : "Switch to Mobile Version"}
-        </button>
-      </div>
     </div>
   );
 } 

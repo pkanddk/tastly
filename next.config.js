@@ -39,9 +39,6 @@ const nextConfig = {
     'api/extract-recipe': {
       maxDuration: 60,
     },
-    'api/extract-recipe-mobile': {
-      maxDuration: 30,
-    },
   },
 };
 
