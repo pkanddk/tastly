@@ -543,25 +543,23 @@ export async function extractRecipeWithDeepSeekMobile(url: string) {
 
 export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: boolean = false) {
   try {
-    console.log(`Extracting recipe with optimized DeepSeek from ${url} (mobile: ${isMobile})`);
+    console.log(`[DEBUG] Extracting recipe with optimized DeepSeek from ${url} (mobile: ${isMobile})`);
     
     // Generate a unique cache key to avoid using old cached results
-    const cacheKey = `optimized-v2:${url}:${isMobile ? 'mobile' : 'desktop'}`;
-    
-    // Check cache first
-    const cachedItem = recipeCache.get(cacheKey);
-    if (cachedItem && (Date.now() - cachedItem.timestamp) < CACHE_TTL) {
-      console.log("Using cached optimized recipe for:", url);
-      return cachedItem.data;
-    }
+    // Add a timestamp to force a fresh extraction for debugging
+    const cacheKey = `optimized-v3:${url}:${isMobile ? 'mobile' : 'desktop'}:${Date.now()}`;
+    console.log(`[DEBUG] Using cache key: ${cacheKey}`);
     
     // Initialize DeepSeek client
     const openai = new OpenAI({
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       baseURL: 'https://api.deepseek.com',
     });
+    console.log(`[DEBUG] DeepSeek API Key length: ${process.env.DEEPSEEK_API_KEY?.length || 0}`);
+    console.log(`[DEBUG] DeepSeek Base URL: ${openai.baseURL}`);
     
     // Create an even more explicit prompt
+    console.log(`[DEBUG] Sending request to DeepSeek API`);
     const completion = await openai.chat.completions.create({
       model: "deepseek-chat",
       messages: [
@@ -635,21 +633,26 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       stream: false
     });
     
+    console.log(`[DEBUG] Received response from DeepSeek API`);
     const content = completion.choices[0].message.content || '';
+    console.log(`[DEBUG] Raw content from DeepSeek:\n${content}`);
     
     // Parse the markdown content
     const titleMatch = content.match(/# (.*)/);
     const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
+    console.log(`[DEBUG] Extracted title: ${title}`);
     
     const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
     const ingredients = ingredientsMatch 
       ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
       : [];
+    console.log(`[DEBUG] Extracted ingredients: ${JSON.stringify(ingredients)}`);
     
     const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
     const instructions = instructionsMatch
       ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i)
       : [];
+    console.log(`[DEBUG] Extracted instructions: ${JSON.stringify(instructions)}`);
     
     const result = {
       title,
@@ -657,19 +660,13 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       instructions,
       markdown: content,
       original: content,
-      method: isMobile ? 'deepseek-mobile-optimized-v2' : 'deepseek-optimized-v2',
+      method: isMobile ? 'deepseek-mobile-optimized-v3' : 'deepseek-optimized-v3',
       url
     };
     
-    // Cache the result
-    recipeCache.set(cacheKey, {
-      data: result,
-      timestamp: Date.now()
-    });
-    
     return result;
   } catch (error) {
-    console.error('Error in optimized DeepSeek extraction:', error);
+    console.error('[DEBUG] Error in optimized DeepSeek extraction:', error);
     throw error;
   }
 } 

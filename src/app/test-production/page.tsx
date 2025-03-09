@@ -120,6 +120,16 @@ export default function TestProduction() {
               {JSON.stringify(result, null, 2)}
             </pre>
           </div>
+          <div className="bg-yellow-100 p-4 rounded mb-4">
+            <h3 className="font-medium mb-2">Debug Information:</h3>
+            <p><strong>Method:</strong> {result.method}</p>
+            <p><strong>URL:</strong> {result.url}</p>
+            <p><strong>Ingredients Count:</strong> {result.ingredients?.length || 0}</p>
+            <p><strong>Instructions Count:</strong> {result.instructions?.length || 0}</p>
+            <pre className="whitespace-pre-wrap bg-white p-3 border rounded text-sm mt-2">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </div>
         </div>
       )}
     </div>
