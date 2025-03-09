@@ -137,7 +137,7 @@ export async function extractRecipeWithAI(url: string, isMobile: boolean = false
   }
 }
 
-// Update the simple extraction function to use DeepSeek with a simpler prompt
+// Update the simple extraction function to be even more efficient:
 export async function extractRecipeSimple(url: string) {
   try {
     console.log("Using simplified DeepSeek extraction for mobile:", url);
@@ -159,20 +159,7 @@ export async function extractRecipeSimple(url: string) {
     const $ = load(html);
     const title = $('title').text().trim();
     
-    // Extract just a small amount of content to keep the request size small
-    const metaTags = $('meta[name="description"], meta[property="og:description"]')
-      .map((_, el) => $(el).attr('content'))
-      .get()
-      .join(' ');
-    
-    // Look for recipe-specific content first, but keep it very brief
-    const recipeContent = $('.recipe, .ingredients, .instructions')
-      .map((_, el) => $(el).text().substring(0, 500))
-      .get()
-      .join(' ')
-      .substring(0, 1000);
-    
-    // Now use DeepSeek API with a very focused prompt
+    // Use a very minimal prompt
     const apiUrl = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
     const apiKey = process.env.DEEPSEEK_API_KEY;
     
@@ -180,7 +167,7 @@ export async function extractRecipeSimple(url: string) {
       throw new Error('DeepSeek API key is not configured');
     }
     
-    // Create a very focused prompt
+    // Create a very focused prompt with minimal content
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -196,11 +183,11 @@ export async function extractRecipeSimple(url: string) {
           },
           {
             role: "user",
-            content: `Extract the recipe from this URL: ${url}\nTitle: ${title}\nDescription: ${metaTags}\nContent: ${recipeContent}`
+            content: `Extract the recipe from this URL: ${url}`
           }
         ],
         temperature: 0.1,
-        max_tokens: 1000 // Reduced to minimize processing time
+        max_tokens: 500 // Reduced even further
       })
     });
     

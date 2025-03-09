@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           // Set a timeout for the extraction
           const extractionPromise = extractRecipeSimple(validatedUrl);
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("Extraction timed out")), 8000); // 8 second timeout
+            setTimeout(() => reject(new Error("Extraction timed out")), 15000); // Increased from 8 to 15 seconds
           });
           
           // Race the extraction against the timeout

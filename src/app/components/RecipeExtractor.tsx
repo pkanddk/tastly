@@ -135,6 +135,59 @@ export default function RecipeExtractor() {
     console.log("Raw recipe data:", typeof recipe, 
       typeof recipe === 'string' ? recipe.substring(0, 100) : JSON.stringify(recipe).substring(0, 100));
 
+    // For mobile, use a simpler display format
+    if (isMobile()) {
+      return (
+        <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+          <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
+          <div className="mb-4">
+            <button 
+              onClick={() => alert(typeof recipe === 'string' ? recipe : JSON.stringify(recipe, null, 2))}
+              className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+            >
+              Show Raw Data
+            </button>
+          </div>
+          {typeof recipe === 'string' ? (
+            <div className="whitespace-pre-wrap text-gray-200 text-sm">
+              {recipe.split('\n').map((line, i) => (
+                <p key={i} className="mb-2">{line}</p>
+              ))}
+            </div>
+          ) : (
+            // Handle object format
+            <div className="text-gray-200 text-sm">
+              <h3 className="text-lg font-semibold mb-2">{recipe.title || 'Recipe'}</h3>
+              {recipe.description && <p className="italic mb-4">{recipe.description}</p>}
+              
+              {recipe.ingredients && recipe.ingredients.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium mb-1">Ingredients:</h4>
+                  <ul className="list-disc pl-5">
+                    {recipe.ingredients.map((ing, i) => (
+                      <li key={i}>{ing}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {recipe.instructions && recipe.instructions.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-1">Instructions:</h4>
+                  <ol className="list-decimal pl-5">
+                    {recipe.instructions.map((step, i) => (
+                      <li key={i} className="mb-2">{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // For desktop, use the more complex format
     try {
       // Try to parse if it's a string that looks like JSON
       let parsedRecipe;
@@ -329,7 +382,7 @@ export default function RecipeExtractor() {
             <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
             <div className="mb-4">
               <button 
-                onClick={() => alert(typeof recipe === 'string' ? recipe.substring(0, 500) : JSON.stringify(recipe, null, 2).substring(0, 500))}
+                onClick={() => alert(typeof recipe === 'string' ? recipe : JSON.stringify(recipe, null, 2))}
                 className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
               >
                 Show Raw Data
