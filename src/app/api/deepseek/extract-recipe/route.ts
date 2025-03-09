@@ -15,6 +15,9 @@ export async function POST(request: NextRequest) {
       userAgent: userAgent.substring(0, 100) 
     });
     
+    console.log("Request headers:", Object.fromEntries(request.headers.entries()));
+    console.log("Request body:", { url, isMobile, debug });
+    
     if (!url) {
       return NextResponse.json(
         { error: 'URL is required' },
@@ -27,6 +30,13 @@ export async function POST(request: NextRequest) {
     try {
       validatedUrl = new URL(url).toString();
       console.log("Validated URL:", validatedUrl);
+      console.log("URL validation result:", {
+        original: url,
+        validated: validatedUrl,
+        protocol: new URL(validatedUrl).protocol,
+        hostname: new URL(validatedUrl).hostname,
+        pathname: new URL(validatedUrl).pathname
+      });
     } catch (e) {
       return NextResponse.json(
         { error: 'Invalid URL format' },

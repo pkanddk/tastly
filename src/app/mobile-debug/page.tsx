@@ -31,6 +31,10 @@ export default function MobileDebugPage() {
       setLoading(true);
       setTestResult('Starting direct fetch test...');
       
+      // Clean the URL before sending
+      const cleanUrl = testUrl.trim();
+      setTestResult(prev => `${prev}\nCleaned URL: ${cleanUrl}`);
+      
       // Test direct fetch to the API
       const response = await fetch('/api/deepseek/extract-recipe', {
         method: 'POST',
@@ -39,9 +43,10 @@ export default function MobileDebugPage() {
           'X-Is-Mobile': 'true'
         },
         body: JSON.stringify({ 
-          url: testUrl, 
+          url: cleanUrl, // Use the cleaned URL
           isMobile: true,
-          debug: true
+          debug: true,
+          timestamp: new Date().toISOString() // Add timestamp to prevent caching
         }),
       });
       

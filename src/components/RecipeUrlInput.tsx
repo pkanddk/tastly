@@ -18,8 +18,14 @@ export default function RecipeUrlInput({ url, setUrl, onExtract, loading, error,
   };
 
   const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newUrl = e.target.value;
-    setUrl(newUrl);
+    // Get the raw value from the input
+    const rawValue = e.target.value;
+    
+    // Clean the URL (remove leading/trailing whitespace)
+    const cleanValue = rawValue.trim();
+    
+    // Update the URL state
+    setUrl(cleanValue);
     
     // Clear any previous error when the user types
     if (error) {

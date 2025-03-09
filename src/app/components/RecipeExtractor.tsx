@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { extractRecipeFromUrl } from '../lib/deepseek';
 
@@ -27,11 +27,24 @@ const FireIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Mobile detection
+const isMobile = () => {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 export default function RecipeExtractor() {
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Reset URL and recipe when component mounts
+    setUrl('');
+    setRecipe(null);
+    setError(null);
+  }, []);
 
   const handleExtract = async () => {
     if (!url) {
@@ -41,6 +54,8 @@ export default function RecipeExtractor() {
 
     // Clean and validate the URL
     let cleanUrl = url.trim();
+    console.log("Original URL:", url);
+    console.log("Cleaned URL:", cleanUrl);
     
     // Check if it's a valid URL
     try {
@@ -59,17 +74,22 @@ export default function RecipeExtractor() {
       console.log("Device info:", { isMobile: isMobileDevice, userAgent: navigator.userAgent });
       console.log("Extracting recipe from URL:", cleanUrl);
       
+      // Use a fresh object for the request body
+      const requestBody = { 
+        url: cleanUrl, 
+        isMobile: isMobileDevice,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log("Request body:", JSON.stringify(requestBody));
+      
       const response = await fetch('/api/deepseek/extract-recipe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Is-Mobile': isMobileDevice ? 'true' : 'false'
         },
-        body: JSON.stringify({ 
-          url: cleanUrl, 
-          isMobile: isMobileDevice,
-          timestamp: new Date().toISOString()
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
@@ -280,6 +300,8 @@ export default function RecipeExtractor() {
           }} 
           onExtract={handleExtract} 
           loading={loading}
+          error={error}
+          setError={setError}
         />
         {error && <p className="text-red-500 mt-2">{error}</p>}
       </div>
