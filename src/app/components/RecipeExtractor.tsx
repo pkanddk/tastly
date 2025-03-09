@@ -54,8 +54,6 @@ export default function RecipeExtractor() {
 
     // Clean and validate the URL
     let cleanUrl = url.trim();
-    console.log("Original URL:", url);
-    console.log("Cleaned URL:", cleanUrl);
     
     // Check if it's a valid URL
     try {
@@ -81,8 +79,6 @@ export default function RecipeExtractor() {
         timestamp: new Date().toISOString()
       };
       
-      console.log("Request body:", JSON.stringify(requestBody));
-      
       // Use different endpoints for mobile and desktop
       const endpoint = isMobileDevice 
         ? '/api/deepseek/extract-recipe-mobile' 
@@ -107,25 +103,9 @@ export default function RecipeExtractor() {
       const responseText = await response.text();
       console.log("Raw response text:", responseText.substring(0, 100));
       
-      // For mobile devices, always use the text directly without any parsing
-      if (isMobileDevice) {
-        // Just set the raw text as the recipe
-        setRecipe(responseText);
-      } else {
-        // For desktop, try to parse as JSON if it looks like JSON
-        try {
-          if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
-            const jsonData = JSON.parse(responseText);
-            setRecipe(jsonData);
-          } else {
-            setRecipe(responseText);
-          }
-        } catch (parseError) {
-          console.error("JSON parse error:", parseError);
-          // If JSON parsing fails, just use the text
-          setRecipe(responseText);
-        }
-      }
+      // Set the recipe directly without any parsing
+      setRecipe(responseText);
+      
     } catch (err) {
       console.error('Extraction error:', err);
       setError(`Failed to extract recipe. ${err instanceof Error ? err.message : 'Please try a different URL.'}`);
@@ -382,21 +362,17 @@ export default function RecipeExtractor() {
           <p className="text-gray-300">Extracting recipe...</p>
         </div>
       ) : recipe ? (
-        isMobile() ? (
-          <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
-            <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
-            <div className="whitespace-pre-wrap text-gray-200 text-sm">
-              {typeof recipe === 'string' ? 
-                recipe.split('\n').map((line, i) => (
-                  <p key={i} className="mb-2">{line}</p>
-                )) : 
-                JSON.stringify(recipe, null, 2)
-              }
-            </div>
+        <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+          <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
+          <div className="whitespace-pre-wrap text-gray-200 text-sm">
+            {typeof recipe === 'string' ? 
+              recipe.split('\n').map((line, i) => (
+                <p key={i} className="mb-2">{line}</p>
+              )) : 
+              JSON.stringify(recipe, null, 2)
+            }
           </div>
-        ) : (
-          formatRecipe(recipe)
-        )
+        </div>
       ) : null}
     </div>
   );
