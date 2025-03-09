@@ -81,8 +81,8 @@ export default function RecipeExtractor() {
       
       // Use different endpoints for mobile and desktop
       const endpoint = isMobileDevice 
-        ? '/api/deepseek/extract-recipe-mobile' 
-        : '/api/deepseek/extract-recipe';
+        ? '/api/extract-recipe-mobile' 
+        : '/api/extract-recipe';
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -93,23 +93,38 @@ export default function RecipeExtractor() {
         body: JSON.stringify(requestBody),
       });
       
+      // Handle non-OK responses
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API error:', response.status, errorText);
-        throw new Error(`Failed to extract recipe: ${response.status}`);
+        if (response.status === 504) {
+          throw new Error('Recipe extraction timed out. Please try again later.');
+        }
+        
+        // Try to parse the error response as JSON
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Failed to extract recipe: ${response.status}`);
+        } catch (jsonError) {
+          // If we can't parse as JSON, use the text
+          const errorText = await response.text();
+          throw new Error(`Failed to extract recipe: ${errorText.substring(0, 100)}`);
+        }
       }
       
       // Parse the JSON response
-      const jsonData = await response.json();
-      console.log("API response:", jsonData);
-      
-      if (jsonData.error) {
-        throw new Error(jsonData.error);
+      try {
+        const jsonData = await response.json();
+        console.log("API response:", jsonData);
+        
+        if (jsonData.error) {
+          throw new Error(jsonData.error);
+        }
+        
+        // Use the markdown property for display
+        setRecipe(jsonData.markdown);
+      } catch (jsonError) {
+        console.error('JSON parsing error:', jsonError);
+        throw new Error('Failed to parse the recipe data. Please try again.');
       }
-      
-      // Use the markdown property for display
-      setRecipe(jsonData.markdown);
-      
     } catch (err) {
       console.error('Extraction error:', err);
       setError(`Failed to extract recipe. ${err instanceof Error ? err.message : 'Please try a different URL.'}`);
