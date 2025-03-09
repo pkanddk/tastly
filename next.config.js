@@ -10,7 +10,7 @@ const nextConfig = {
         pathname: '**',
       },
     ],
-    domains: ['firebasestorage.googleapis.com'],
+    domains: ['firebasestorage.googleapis.com', 'replicate.delivery'],
   },
   eslint: {
     ignoreDuringBuilds: true,

@@ -543,10 +543,10 @@ export async function extractRecipeWithDeepSeekMobile(url: string) {
 
 export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: boolean = false) {
   try {
-    console.log(`[DEBUG] Extracting recipe with optimized DeepSeek from ${url} (mobile: ${isMobile})`);
+    console.log(`[DEBUG] Extracting recipe with DeepSeek from ${url} (mobile: ${isMobile})`);
     
-    // Generate a unique cache key to avoid using old cached results
-    const cacheKey = `optimized-v4:${url}:${isMobile ? 'mobile' : 'desktop'}`;
+    // Generate a unique cache key
+    const cacheKey = `optimized-v6:${url}:${isMobile ? 'mobile' : 'desktop'}`;
     console.log(`[DEBUG] Using cache key: ${cacheKey}`);
     
     // Check cache first
@@ -556,108 +556,82 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       return cachedItem.data;
     }
     
-    // First, try to fetch just the HTML content ourselves
-    console.log("[DEBUG] Fetching HTML content");
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    try {
-      const response = await fetch(url, { 
-        signal: controller.signal,
-        headers: {
-          'User-Agent': isMobile 
-            ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-            : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
-      }
-      
-      const html = await response.text();
-      
-      // Use Cheerio to extract only the relevant content
-      const $ = cheerio.load(html);
-      
-      // Remove navigation, header, footer, and other non-content elements
-      $('nav, header, footer, aside, .nav, .menu, .navigation, .header, .footer, .sidebar, #nav, #menu, #header, #footer, #sidebar').remove();
-      $('[role="navigation"], [role="banner"], [role="contentinfo"]').remove();
-      $('script, style, comment, iframe, .ad, .ads, .advertisement').remove();
-      
-      // Extract only the ingredients and instructions directly
-      let ingredients: string[] = [];
-      let instructions: string[] = [];
-      
-      // Look for ingredients
-      $('[itemprop="recipeIngredient"], .ingredients-item-name, .ingredients li, .ingredient-list li').each((i, el) => {
-        const text = $(el).text().trim();
-        if (text && !text.includes('Log In') && !text.includes('Search') && text.length > 2 && text.length < 200) {
-          ingredients.push(text);
-        }
-      });
-      
-      // Look for instructions
-      $('[itemprop="recipeInstructions"], .instructions-item-name, .instructions li, .recipe-directions__list--item').each((i, el) => {
-        const text = $(el).text().trim();
-        if (text && !text.includes('Log In') && !text.includes('Search') && text.length > 10) {
-          instructions.push(text);
-        }
-      });
-      
-      // If we found ingredients and instructions, return them directly
-      if (ingredients.length > 0 && instructions.length > 0) {
-        console.log("[DEBUG] Found ingredients and instructions directly in HTML");
-        
-        const title = $('h1').first().text().trim() || $('title').text().trim();
-        
-        const result = {
-          title,
-          ingredients,
-          instructions,
-          markdown: `# ${title}\n\n## Ingredients\n${ingredients.map(i => `- ${i}`).join('\n')}\n\n## Instructions\n${instructions.map((i, idx) => `${idx+1}. ${i}`).join('\n')}`,
-          original: `Extracted directly from HTML`,
-          method: 'direct-html-extraction',
-          url
-        };
-        
-        // Cache the result
-        recipeCache.set(cacheKey, {
-          data: result,
-          timestamp: Date.now()
-        });
-        
-        return result;
-      }
-      
-      console.log("[DEBUG] Could not find ingredients and instructions directly, falling back to simple extraction");
-    } catch (htmlError) {
-      console.error("[DEBUG] Error fetching or parsing HTML:", htmlError);
-      clearTimeout(timeoutId);
-    }
-    
-    // If direct HTML extraction failed, use a very simple DeepSeek call
-    console.log("[DEBUG] Using simplified DeepSeek extraction");
-    
     // Initialize DeepSeek client
     const openai = new OpenAI({
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       baseURL: 'https://api.deepseek.com',
     });
+    console.log(`[DEBUG] DeepSeek API Key length: ${process.env.DEEPSEEK_API_KEY?.length || 0}`);
+    console.log(`[DEBUG] DeepSeek Base URL: ${openai.baseURL}`);
     
     // Use a very minimal prompt with just the URL and a low token count
+    console.log(`[DEBUG] Sending request to DeepSeek API`);
     const completion = await openai.chat.completions.create({
       model: "deepseek-chat",
       messages: [
         {
           role: "system",
-          content: "Extract ONLY the ingredients and instructions from this recipe URL. Format as markdown with ## Ingredients as a list and ## Instructions as numbered steps. NEVER include navigation elements like 'Log In', 'Search', etc."
+          content: `You are a recipe extraction expert. Your task is to extract ONLY the actual recipe from a URL.
+          
+          CRITICAL INSTRUCTIONS:
+          1. NEVER include navigation elements like "Log In", "Search", "Menu", etc.
+          2. NEVER include website UI elements or links
+          3. ONLY extract actual recipe ingredients (food items and measurements)
+          4. ONLY extract actual cooking instructions
+          5. If you're not 100% sure something is part of the recipe, DO NOT include it
+          
+          Format your response as markdown with:
+          # Recipe Title
+          ## Ingredients
+          - Ingredient 1 (ONLY actual food items and measurements)
+          - Ingredient 2 (ONLY actual food items and measurements)
+          ## Instructions
+          1. Step 1 (ONLY actual cooking steps)
+          2. Step 2 (ONLY actual cooking steps)
+          
+          EXAMPLES OF WHAT NOT TO INCLUDE:
+          - "Log In"
+          - "Search"
+          - "Menu"
+          - "Home"
+          - "About"
+          - "Contact"
+          - "Privacy Policy"
+          - "Terms of Service"
+          - "Subscribe"
+          - "Newsletter"
+          - "Share"
+          - "Print"
+          - "Save"
+          - "Email"
+          - "Pin"
+          - "Tweet"
+          - "Facebook"
+          - "Instagram"
+          - "Twitter"
+          - "Pinterest"
+          - "YouTube"
+          - "TikTok"
+          - "LinkedIn"
+          - "View All"
+          - "Read More"
+          - "See More"
+          - "Show More"
+          - "Load More"
+          - "Next"
+          - "Previous"
+          - "Back"
+          - "Forward"
+          - "Continue"
+          - "Submit"
+          
+          REMEMBER: ONLY extract the actual recipe ingredients and instructions. Nothing else.`
         },
         {
           role: "user",
-          content: `Extract ONLY the recipe from this URL: ${url}`
+          content: `Extract ONLY the recipe from this URL: ${url}
+          
+          Remember to IGNORE all navigation elements, menus, login prompts, search bars, and other website UI elements.`
         }
       ],
       temperature: 0.1,
@@ -667,20 +641,24 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
     
     console.log(`[DEBUG] Received response from DeepSeek API`);
     const content = completion.choices[0].message.content || '';
+    console.log(`[DEBUG] Raw content from DeepSeek:\n${content}`);
     
     // Parse the markdown content
     const titleMatch = content.match(/# (.*)/);
     const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
+    console.log(`[DEBUG] Extracted title: ${title}`);
     
     const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
     const ingredients = ingredientsMatch 
       ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i && !i.includes('Log In') && !i.includes('Search'))
       : [];
+    console.log(`[DEBUG] Extracted ingredients: ${JSON.stringify(ingredients)}`);
     
     const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
     const instructions = instructionsMatch
       ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i && !i.includes('Log In') && !i.includes('Search'))
       : [];
+    console.log(`[DEBUG] Extracted instructions: ${JSON.stringify(instructions)}`);
     
     const result = {
       title,
@@ -688,7 +666,7 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       instructions,
       markdown: content,
       original: content,
-      method: 'deepseek-minimal',
+      method: isMobile ? 'deepseek-mobile-optimized-v6' : 'deepseek-optimized-v6',
       url
     };
     
@@ -700,14 +678,14 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
     
     return result;
   } catch (error) {
-    console.error('[DEBUG] Error in optimized DeepSeek extraction:', error);
+    console.error('[DEBUG] Error in DeepSeek extraction:', error);
     
-    // If all else fails, return a basic error result
+    // Return a basic fallback result
     return {
       title: "Recipe Extraction Failed",
-      ingredients: ["Could not extract ingredients due to timeout"],
-      instructions: ["Please try again later or manually copy the recipe"],
-      markdown: "# Recipe Extraction Failed\n\nThe recipe extraction timed out. Please try again later or manually copy the recipe.",
+      ingredients: ["Could not extract ingredients"],
+      instructions: ["Please visit the original recipe"],
+      markdown: `# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please visit the original recipe at: ${url}`,
       original: "Extraction failed",
       method: 'error-fallback',
       url
