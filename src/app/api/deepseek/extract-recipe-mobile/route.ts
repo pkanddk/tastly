@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { extractRecipeWithDeepSeekMobile } from '@/app/lib/server/recipeExtractor';
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,11 +23,29 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Return a simple message with the URL in the structured format
-    return NextResponse.json({
-      markdown: `# Recipe from: ${validatedUrl}\n\nWe're currently optimizing our mobile recipe extraction.\nPlease try using our desktop version for full recipe details,\nor visit the original website directly.`,
-      original: null
-    });
+    // Perform actual mobile extraction
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    
+    try {
+      const recipeContent = await extractRecipeWithDeepSeekMobile(validatedUrl);
+      clearTimeout(timeoutId);
+      
+      return NextResponse.json({ 
+        markdown: recipeContent.markdown,
+        original: recipeContent.original
+      });
+      
+    } catch (error) {
+      console.error("Mobile extraction error:", error);
+      return NextResponse.json(
+        { 
+          error: error instanceof Error ? error.message : 'Mobile extraction failed',
+          markdown: `# Recipe from: ${validatedUrl}\n\nWe're having trouble with mobile extraction.\nPlease try the desktop version or visit the original site.`
+        },
+        { status: 500 }
+      );
+    }
     
   } catch (error) {
     console.error('Error in mobile recipe extraction:', error);

@@ -490,7 +490,16 @@ export async function extractRecipeWithDeepSeekMobile(url: string) {
       messages: [
         {
           role: "system",
-          content: "Extract only the ingredients and instructions from recipe URLs. Be extremely concise. Format as markdown with ## Ingredients and ## Instructions sections."
+          content: `MOBILE EXTRACTION RULES:
+          1. Extract ONLY ingredients and instructions
+          2. Ignore ads, navigation, comments
+          3. Use short simple sentences
+          4. Format as:
+             # Title
+             ## Ingredients
+             - Item 1
+             ## Instructions
+             1. Step 1`
         },
         {
           role: "user",

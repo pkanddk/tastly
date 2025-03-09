@@ -5,6 +5,10 @@ import Image from 'next/image';
 import RecipeDisplay from '@/components/RecipeDisplay';
 import { DEFAULT_RECIPE_IMAGE, getRecipeFromCache, cacheRecipeUrl } from '@/lib/firebase/firebaseUtils';
 
+const isMobileDevice = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
 export default function RecipeExtractorClient() {
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<any>(null);
@@ -68,7 +72,7 @@ export default function RecipeExtractorClient() {
             resolve(cachedRecipe);
           } else {
             // Fetch fresh recipe
-            const response = await fetch('/api/extract-recipe', {
+            const response = await fetch(isMobileDevice() ? '/api/deepseek/extract-recipe-mobile' : '/api/extract-recipe', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
