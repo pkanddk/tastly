@@ -57,6 +57,25 @@ export async function POST(request: NextRequest) {
       });
     }
     
+    if (isMobile) {
+      console.log("Processing mobile request differently");
+      
+      // For mobile, always return plain text to avoid parsing issues
+      const recipeMarkdown = await extractRecipeFromUrl(validatedUrl);
+      
+      // If it's an object, convert to string
+      const responseText = typeof recipeMarkdown === 'object' 
+        ? JSON.stringify(recipeMarkdown) 
+        : recipeMarkdown;
+      
+      return new NextResponse(responseText, {
+        headers: {
+          'Content-Type': 'text/plain'
+        }
+      });
+    }
+    
+    // Regular processing for desktop
     console.log("Extracting recipe from URL:", validatedUrl);
     const recipeMarkdown = await extractRecipeFromUrl(validatedUrl);
     console.log("Recipe extraction result type:", typeof recipeMarkdown);

@@ -99,16 +99,39 @@ export default function RecipeExtractor() {
       }
       
       const contentType = response.headers.get('Content-Type');
+      console.log("Response content type:", contentType);
+      
       let extractedRecipe;
       
-      if (contentType?.includes('application/json')) {
-        extractedRecipe = await response.json();
-      } else {
-        extractedRecipe = await response.text();
+      try {
+        if (contentType?.includes('application/json')) {
+          extractedRecipe = await response.json();
+          console.log("Parsed JSON response successfully");
+        } else {
+          extractedRecipe = await response.text();
+          console.log("Parsed text response successfully");
+        }
+        
+        console.log("Extracted recipe type:", typeof extractedRecipe);
+        
+        // Check if the recipe is valid
+        if (!extractedRecipe) {
+          throw new Error("Empty recipe response");
+        }
+        
+        setRecipe(extractedRecipe);
+      } catch (parseError) {
+        console.error("Error parsing response:", parseError);
+        
+        // Try to get the raw response as a fallback
+        try {
+          const rawText = await response.text();
+          console.log("Raw response text:", rawText.substring(0, 200));
+          setRecipe(rawText);
+        } catch (e) {
+          throw new Error(`Failed to parse response: ${parseError.message}`);
+        }
       }
-      
-      console.log("Extracted recipe type:", typeof extractedRecipe);
-      setRecipe(extractedRecipe);
     } catch (err) {
       console.error('Extraction error:', err);
       setError(`Failed to extract recipe. ${err instanceof Error ? err.message : 'Please try a different URL.'}`);
@@ -315,12 +338,47 @@ export default function RecipeExtractor() {
         isMobile() ? (
           <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
             <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
+            <div className="mb-4">
+              <button 
+                onClick={() => alert(typeof recipe === 'string' ? recipe.substring(0, 500) : JSON.stringify(recipe, null, 2).substring(0, 500))}
+                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+              >
+                Show Raw Data
+              </button>
+            </div>
             {typeof recipe === 'string' ? (
-              <pre className="whitespace-pre-wrap text-gray-200 text-sm">{recipe}</pre>
+              <div className="whitespace-pre-wrap text-gray-200 text-sm">
+                {recipe.split('\n').map((line, i) => (
+                  <p key={i} className="mb-2">{line}</p>
+                ))}
+              </div>
             ) : (
-              <pre className="whitespace-pre-wrap text-gray-200 text-sm">
-                {JSON.stringify(recipe, null, 2)}
-              </pre>
+              <div className="text-gray-200 text-sm">
+                <h3 className="text-lg font-semibold mb-2">{recipe.title || 'Recipe'}</h3>
+                {recipe.description && <p className="italic mb-4">{recipe.description}</p>}
+                
+                {recipe.ingredients && recipe.ingredients.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="font-medium mb-1">Ingredients:</h4>
+                    <ul className="list-disc pl-5">
+                      {recipe.ingredients.map((ing, i) => (
+                        <li key={i}>{ing}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {recipe.instructions && recipe.instructions.length > 0 && (
+                  <div>
+                    <h4 className="font-medium mb-1">Instructions:</h4>
+                    <ol className="list-decimal pl-5">
+                      {recipe.instructions.map((step, i) => (
+                        <li key={i} className="mb-2">{step}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         ) : (

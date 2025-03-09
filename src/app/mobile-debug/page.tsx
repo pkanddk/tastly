@@ -81,6 +81,57 @@ export default function MobileDebugPage() {
     }
   };
 
+  const testMobileExtraction = async () => {
+    try {
+      setLoading(true);
+      setTestResult('Starting mobile extraction test...');
+      
+      // Clean the URL before sending
+      const cleanUrl = testUrl.trim();
+      setTestResult(prev => `${prev}\nCleaned URL: ${cleanUrl}`);
+      
+      // Test with the actual recipe extraction endpoint (not debug mode)
+      const response = await fetch('/api/deepseek/extract-recipe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Is-Mobile': 'true'
+        },
+        body: JSON.stringify({ 
+          url: cleanUrl,
+          isMobile: true,
+          timestamp: new Date().toISOString()
+        }),
+      });
+      
+      setTestResult(prev => `${prev}\nResponse status: ${response.status}`);
+      
+      const contentType = response.headers.get('Content-Type');
+      setTestResult(prev => `${prev}\nContent-Type: ${contentType}`);
+      
+      try {
+        const responseText = await response.text();
+        setTestResult(prev => `${prev}\nResponse text (first 500 chars): ${responseText.substring(0, 500)}...`);
+        
+        // Try to parse as JSON if it looks like JSON
+        if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+          try {
+            const jsonData = JSON.parse(responseText);
+            setTestResult(prev => `${prev}\nSuccessfully parsed as JSON`);
+          } catch (e) {
+            setTestResult(prev => `${prev}\nFailed to parse as JSON: ${e}`);
+          }
+        }
+      } catch (e) {
+        setTestResult(prev => `${prev}\nError reading response: ${e}`);
+      }
+    } catch (err) {
+      setTestResult(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Mobile Debug Page</h1>
@@ -108,6 +159,19 @@ export default function MobileDebugPage() {
             disabled={loading}
           >
             {loading ? 'Testing...' : 'Test Direct API Fetch'}
+          </button>
+        </div>
+      </div>
+      
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-2">Test Actual Recipe Extraction</h2>
+        <div className="flex flex-col gap-4">
+          <button 
+            onClick={testMobileExtraction}
+            className="bg-green-600 hover:bg-green-500 text-white font-medium py-2 px-4 rounded-lg mt-4"
+            disabled={loading}
+          >
+            {loading ? 'Testing...' : 'Test Actual Recipe Extraction'}
           </button>
         </div>
       </div>
