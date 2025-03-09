@@ -545,8 +545,8 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
   try {
     console.log(`Extracting recipe with optimized DeepSeek from ${url} (mobile: ${isMobile})`);
     
-    // Generate a cache key
-    const cacheKey = `optimized:${url}:${isMobile ? 'mobile' : 'desktop'}`;
+    // Generate a unique cache key to avoid using old cached results
+    const cacheKey = `optimized-v2:${url}:${isMobile ? 'mobile' : 'desktop'}`;
     
     // Check cache first
     const cachedItem = recipeCache.get(cacheKey);
@@ -555,119 +555,79 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       return cachedItem.data;
     }
     
-    // Fetch the page content
-    const response = await fetch(url, { 
-      headers: {
-        'User-Agent': isMobile 
-          ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
-          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
-    }
-    
-    const html = await response.text();
-    
-    // Use Cheerio to parse the HTML
-    const $ = cheerio.load(html);
-    
-    // Remove navigation, header, footer, and other non-content elements
-    $('nav, header, footer, aside, .nav, .menu, .navigation, .header, .footer, .sidebar, #nav, #menu, #header, #footer, #sidebar').remove();
-    $('[role="navigation"], [role="banner"], [role="contentinfo"]').remove();
-    $('script, style, comment, iframe, .ad, .ads, .advertisement').remove();
-    
-    // Extract only the relevant content
-    let relevantContent = '';
-    
-    // Look for recipe-specific containers first
-    const recipeContainers = $('.recipe, .recipe-container, .recipe-content, article.post, .entry-content, [itemtype*="Recipe"]');
-    
-    if (recipeContainers.length > 0) {
-      // Use the first recipe container found
-      relevantContent = recipeContainers.first().text();
-    } else {
-      // If no recipe container found, look for ingredients and instructions sections
-      const ingredientsSection = $('.ingredients, .ingredient-list, [itemprop="recipeIngredient"]').parent();
-      const instructionsSection = $('.instructions, .directions, [itemprop="recipeInstructions"]').parent();
-      
-      if (ingredientsSection.length > 0) {
-        relevantContent += ingredientsSection.text() + '\n\n';
-      }
-      
-      if (instructionsSection.length > 0) {
-        relevantContent += instructionsSection.text();
-      }
-      
-      // If still no content, use the main content area
-      if (!relevantContent.trim()) {
-        relevantContent = $('main, #content, .content, article').text();
-      }
-      
-      // If still no content, use a more targeted approach for common recipe sites
-      if (!relevantContent.trim() || relevantContent.length > 10000) {
-        // For AllRecipes.com
-        if (url.includes('allrecipes.com')) {
-          // For AllRecipes.com, target only the specific recipe content sections
-          const ingredientsList = $('.ingredients-section .ingredients-item-name');
-          if (ingredientsList.length > 0) {
-            relevantContent = "Ingredients:\n";
-            ingredientsList.each((i, el) => {
-              relevantContent += $(el).text().trim() + "\n";
-            });
-            relevantContent += "\n";
-          }
-          
-          const instructionsList = $('.instructions-section .section-body');
-          if (instructionsList.length > 0) {
-            relevantContent += "Instructions:\n";
-            instructionsList.find('p').each((i, el) => {
-              relevantContent += (i+1) + ". " + $(el).text().trim() + "\n";
-            });
-          }
-          
-          // If we couldn't find the specific elements, try a more general approach
-          if (relevantContent.trim().length < 100) {
-            relevantContent = $('.recipe-container, .recipe-content, .ingredients-section, .instructions-section').text();
-          }
-        }
-        // For Food Network
-        else if (url.includes('foodnetwork.com')) {
-          relevantContent = $('.o-Recipe, .o-Ingredients, .o-Method').text();
-        }
-        // For Epicurious
-        else if (url.includes('epicurious.com')) {
-          relevantContent = $('.recipe-content, .ingredients, .preparation').text();
-        }
-      }
-    }
-    
-    // Clean up the content
-    relevantContent = relevantContent
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, isMobile ? 3000 : 5000); // Limit content length based on device
-    
     // Initialize DeepSeek client
     const openai = new OpenAI({
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       baseURL: 'https://api.deepseek.com',
     });
     
-    // Create a prompt with the relevant content
+    // Create an even more explicit prompt
     const completion = await openai.chat.completions.create({
       model: "deepseek-chat",
       messages: [
         {
           role: "system",
-          content: isMobile
-            ? "Extract only the ingredients and instructions from recipe content. Be extremely concise. Format as markdown with ## Ingredients and ## Instructions sections."
-            : "Extract recipes from content. Format as markdown with # Title, ## Ingredients as a list, and ## Instructions as numbered steps."
+          content: `You are a recipe extraction expert. Your task is to extract ONLY the actual recipe from a URL.
+          
+          CRITICAL INSTRUCTIONS:
+          1. NEVER include navigation elements like "Log In", "Search", "Menu", etc.
+          2. NEVER include website UI elements or links
+          3. ONLY extract actual recipe ingredients (food items and measurements)
+          4. ONLY extract actual cooking instructions
+          5. If you're not 100% sure something is part of the recipe, DO NOT include it
+          
+          Format your response as markdown with:
+          # Recipe Title
+          ## Ingredients
+          - Ingredient 1 (ONLY actual food items and measurements)
+          - Ingredient 2 (ONLY actual food items and measurements)
+          ## Instructions
+          1. Step 1 (ONLY actual cooking steps)
+          2. Step 2 (ONLY actual cooking steps)
+          
+          EXAMPLES OF WHAT NOT TO INCLUDE:
+          - "Log In"
+          - "Search"
+          - "Menu"
+          - "Home"
+          - "About"
+          - "Contact"
+          - "Privacy Policy"
+          - "Terms of Service"
+          - "Subscribe"
+          - "Newsletter"
+          - "Share"
+          - "Print"
+          - "Save"
+          - "Email"
+          - "Pin"
+          - "Tweet"
+          - "Facebook"
+          - "Instagram"
+          - "Twitter"
+          - "Pinterest"
+          - "YouTube"
+          - "TikTok"
+          - "LinkedIn"
+          - "View All"
+          - "Read More"
+          - "See More"
+          - "Show More"
+          - "Load More"
+          - "Next"
+          - "Previous"
+          - "Back"
+          - "Forward"
+          - "Continue"
+          - "Submit"
+          
+          REMEMBER: ONLY extract the actual recipe ingredients and instructions. Nothing else.`
         },
         {
           role: "user",
-          content: `Extract the recipe from this content from ${url}:\n\n${relevantContent}`
+          content: `Extract ONLY the recipe from this URL: ${url}
+          
+          Remember to IGNORE all navigation elements, menus, login prompts, search bars, and other website UI elements.`
         }
       ],
       temperature: 0.1,
@@ -697,7 +657,7 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       instructions,
       markdown: content,
       original: content,
-      method: isMobile ? 'deepseek-mobile-optimized' : 'deepseek-optimized',
+      method: isMobile ? 'deepseek-mobile-optimized-v2' : 'deepseek-optimized-v2',
       url
     };
     
