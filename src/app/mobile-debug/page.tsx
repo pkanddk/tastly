@@ -132,6 +132,11 @@ export default function MobileDebugPage() {
     }
   };
 
+  const resetUrl = () => {
+    setTestUrl('');
+    setTestResult(null);
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">Mobile Debug Page</h1>
@@ -159,6 +164,12 @@ export default function MobileDebugPage() {
             disabled={loading}
           >
             {loading ? 'Testing...' : 'Test Direct API Fetch'}
+          </button>
+          <button 
+            onClick={resetUrl}
+            className="bg-red-600 hover:bg-red-500 text-white font-medium py-2 px-4 rounded-lg"
+          >
+            Reset URL
           </button>
         </div>
       </div>
