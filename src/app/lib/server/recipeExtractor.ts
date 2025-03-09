@@ -137,10 +137,10 @@ export async function extractRecipeWithAI(url: string, isMobile: boolean = false
   }
 }
 
-// Add this function to your recipeExtractor.ts file
+// Update the simple extraction function to use DeepSeek with a simpler prompt
 export async function extractRecipeSimple(url: string) {
   try {
-    console.log("Using simple extraction for mobile:", url);
+    console.log("Using simplified DeepSeek extraction for mobile:", url);
     
     // Generate a cache key
     const cacheKey = `simple:${url}`;
@@ -152,59 +152,68 @@ export async function extractRecipeSimple(url: string) {
       return cachedItem.data;
     }
     
-    // Fetch the HTML
+    // First, try to fetch the HTML content
     const html = await fetchHtml(url);
+    
+    // Use cheerio to extract basic information
     const $ = load(html);
-    
-    // Extract basic information
     const title = $('title').text().trim();
-    const pageUrl = url;
     
-    // Look for common recipe elements
-    let ingredients: string[] = [];
-    let instructions: string[] = [];
+    // Extract just a small amount of content to keep the request size small
+    const metaTags = $('meta[name="description"], meta[property="og:description"]')
+      .map((_, el) => $(el).attr('content'))
+      .get()
+      .join(' ');
     
-    // Try to find ingredients
-    $('.ingredients, .ingredient-list, .recipe-ingredients, [itemprop="recipeIngredient"]')
-      .find('li, p')
-      .each((_, el) => {
-        const text = $(el).text().trim();
-        if (text && !ingredients.includes(text)) {
-          ingredients.push(text);
-        }
-      });
+    // Look for recipe-specific content first, but keep it very brief
+    const recipeContent = $('.recipe, .ingredients, .instructions')
+      .map((_, el) => $(el).text().substring(0, 500))
+      .get()
+      .join(' ')
+      .substring(0, 1000);
     
-    // Try to find instructions
-    $('.instructions, .recipe-instructions, .recipe-steps, [itemprop="recipeInstructions"]')
-      .find('li, p')
-      .each((_, el) => {
-        const text = $(el).text().trim();
-        if (text && !instructions.includes(text)) {
-          instructions.push(text);
-        }
-      });
+    // Now use DeepSeek API with a very focused prompt
+    const apiUrl = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
+    const apiKey = process.env.DEEPSEEK_API_KEY;
     
-    // If we couldn't find structured data, create a simple text summary
-    let result = `# ${title}\n\nFrom: ${pageUrl}\n\n`;
-    
-    if (ingredients.length > 0) {
-      result += "## Ingredients\n\n";
-      ingredients.forEach(ing => {
-        result += `- ${ing}\n`;
-      });
-      result += "\n";
+    if (!apiKey) {
+      throw new Error('DeepSeek API key is not configured');
     }
     
-    if (instructions.length > 0) {
-      result += "## Instructions\n\n";
-      instructions.forEach((step, i) => {
-        result += `${i+1}. ${step}\n`;
-      });
+    // Create a very focused prompt
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: `You are a recipe extraction assistant. Extract only the ingredients and instructions in a simple format. Be very concise.`
+          },
+          {
+            role: "user",
+            content: `Extract the recipe from this URL: ${url}\nTitle: ${title}\nDescription: ${metaTags}\nContent: ${recipeContent}`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 1000 // Reduced to minimize processing time
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`DeepSeek API error: ${response.status} ${errorText}`);
     }
     
-    if (ingredients.length === 0 && instructions.length === 0) {
-      result += "Could not automatically extract recipe details.\nPlease visit the original website for the complete recipe.";
-    }
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    
+    // Format the result in a simple way
+    let result = `# ${title}\n\nFrom: ${url}\n\n${content}`;
     
     // Cache the result
     recipeCache.set(cacheKey, {
@@ -214,7 +223,7 @@ export async function extractRecipeSimple(url: string) {
     
     return result;
   } catch (error) {
-    console.error("Simple extraction error:", error);
+    console.error("Simple DeepSeek extraction error:", error);
     throw error;
   }
 } 
