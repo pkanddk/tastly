@@ -6,17 +6,6 @@ export async function POST(req: NextRequest) {
   try {
     console.log("extract-recipe API route called with URL:", req.url);
     
-    // Log user agent and mobile header
-    const userAgent = req.headers.get('user-agent') || '';
-    const isMobileHeader = req.headers.get('X-Is-Mobile') || 'false';
-    console.log("Request user agent:", userAgent);
-    console.log("Is mobile header:", isMobileHeader);
-    
-    // Check if it's a mobile device
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) || 
-                     isMobileHeader === 'true';
-    console.log("Detected as mobile:", isMobile);
-    
     const { url } = await req.json();
     
     if (!url) {
@@ -28,9 +17,9 @@ export async function POST(req: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
     
     try {
-      // Use the optimized extraction with timeout
+      // Use the optimized extraction with timeout - ALWAYS use desktop mode
       console.log("Using optimized extraction with timeout");
-      const extractPromise = extractRecipeWithDeepSeekOptimized(url, isMobile);
+      const extractPromise = extractRecipeWithDeepSeekOptimized(url, false); // Always false for desktop mode
       
       // Race the extraction against the timeout
       const recipe = await Promise.race([

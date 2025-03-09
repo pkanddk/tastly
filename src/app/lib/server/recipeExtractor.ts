@@ -545,16 +545,9 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
   try {
     console.log(`[DEBUG] Extracting recipe with DeepSeek from ${url} (mobile: ${isMobile})`);
     
-    // Generate a unique cache key
-    const cacheKey = `optimized-v6:${url}:${isMobile ? 'mobile' : 'desktop'}`;
+    // Generate a unique cache key with a timestamp to force fresh extraction
+    const cacheKey = `optimized-v7:${url}:${isMobile ? 'mobile' : 'desktop'}:${Date.now()}`;
     console.log(`[DEBUG] Using cache key: ${cacheKey}`);
-    
-    // Check cache first
-    const cachedItem = recipeCache.get(cacheKey);
-    if (cachedItem && (Date.now() - cachedItem.timestamp) < CACHE_TTL) {
-      console.log("[DEBUG] Using cached optimized recipe for:", url);
-      return cachedItem.data;
-    }
     
     // Initialize DeepSeek client
     const openai = new OpenAI({
@@ -564,8 +557,150 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
     console.log(`[DEBUG] DeepSeek API Key length: ${process.env.DEEPSEEK_API_KEY?.length || 0}`);
     console.log(`[DEBUG] DeepSeek Base URL: ${openai.baseURL}`);
     
-    // Use a very minimal prompt with just the URL and a low token count
-    console.log(`[DEBUG] Sending request to DeepSeek API`);
+    // For mobile, use a much simpler prompt with fewer tokens
+    if (isMobile) {
+      console.log(`[DEBUG] Using simplified mobile extraction`);
+      
+      const completion = await openai.chat.completions.create({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: "Extract ONLY the ingredients and instructions from this recipe URL. Format as a simple list. NEVER include navigation elements like 'Log In', 'Search', 'Menu', etc."
+          },
+          {
+            role: "user",
+            content: `Extract ONLY the recipe from this URL: ${url}`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 300, // Very low token count for mobile
+        stream: false
+      });
+      
+      console.log(`[DEBUG] Received response from DeepSeek API for mobile`);
+      const content = completion.choices[0].message.content || '';
+      console.log(`[DEBUG] Raw content from DeepSeek for mobile:\n${content}`);
+      
+      // Parse the content manually for mobile
+      const lines = content.split('\n').filter(line => line.trim().length > 0);
+      
+      let title = url.split('/').pop() || 'Recipe';
+      const ingredients: string[] = [];
+      const instructions: string[] = [];
+      
+      let currentSection = '';
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // Skip empty lines and navigation elements
+        if (!trimmedLine || 
+            trimmedLine.toLowerCase().includes('log in') || 
+            trimmedLine.toLowerCase().includes('search') ||
+            trimmedLine.toLowerCase().includes('menu') ||
+            trimmedLine.toLowerCase().includes('home')) {
+          continue;
+        }
+        
+        // Check for section headers
+        if (trimmedLine.toLowerCase().includes('ingredient')) {
+          currentSection = 'ingredients';
+          continue;
+        } else if (trimmedLine.toLowerCase().includes('instruction') || 
+                  trimmedLine.toLowerCase().includes('direction') ||
+                  trimmedLine.toLowerCase().includes('method') ||
+                  trimmedLine.toLowerCase().includes('step')) {
+          currentSection = 'instructions';
+          continue;
+        } else if (trimmedLine.startsWith('#')) {
+          // This might be a title or section header
+          if (trimmedLine.startsWith('# ')) {
+            title = trimmedLine.substring(2).trim();
+          }
+          continue;
+        }
+        
+        // Add content to the appropriate section
+        if (currentSection === 'ingredients') {
+          // Clean up the ingredient line
+          let ingredient = trimmedLine;
+          if (ingredient.startsWith('- ')) {
+            ingredient = ingredient.substring(2);
+          } else if (/^\d+\./.test(ingredient)) {
+            ingredient = ingredient.replace(/^\d+\./, '');
+          }
+          
+          if (ingredient.length > 0 && ingredient.length < 200) {
+            ingredients.push(ingredient.trim());
+          }
+        } else if (currentSection === 'instructions') {
+          // Clean up the instruction line
+          let instruction = trimmedLine;
+          if (instruction.startsWith('- ')) {
+            instruction = instruction.substring(2);
+          } else if (/^\d+\./.test(instruction)) {
+            instruction = instruction.replace(/^\d+\./, '');
+          }
+          
+          if (instruction.length > 0) {
+            instructions.push(instruction.trim());
+          }
+        } else if (ingredients.length === 0 && instructions.length === 0) {
+          // If we haven't identified any sections yet, this might be the title
+          if (trimmedLine.length > 3 && trimmedLine.length < 100) {
+            title = trimmedLine;
+          }
+        }
+      }
+      
+      // If we still don't have ingredients or instructions, try to guess based on line content
+      if (ingredients.length === 0 && instructions.length === 0) {
+        for (const line of lines) {
+          const trimmedLine = line.trim();
+          
+          // Skip empty lines and navigation elements
+          if (!trimmedLine || 
+              trimmedLine.toLowerCase().includes('log in') || 
+              trimmedLine.toLowerCase().includes('search')) {
+            continue;
+          }
+          
+          // Guess if this is an ingredient or instruction
+          if (trimmedLine.length < 100 && 
+              (trimmedLine.includes('cup') || 
+               trimmedLine.includes('tbsp') || 
+               trimmedLine.includes('tsp') || 
+               trimmedLine.includes('oz') || 
+               trimmedLine.includes('pound') || 
+               trimmedLine.includes('g '))) {
+            ingredients.push(trimmedLine);
+          } else if (trimmedLine.length > 20) {
+            instructions.push(trimmedLine);
+          }
+        }
+      }
+      
+      console.log(`[DEBUG] Extracted title for mobile: ${title}`);
+      console.log(`[DEBUG] Extracted ingredients for mobile: ${JSON.stringify(ingredients)}`);
+      console.log(`[DEBUG] Extracted instructions for mobile: ${JSON.stringify(instructions)}`);
+      
+      const result = {
+        title,
+        ingredients,
+        instructions,
+        markdown: content,
+        original: content,
+        method: 'deepseek-mobile-v7',
+        url
+      };
+      
+      return result;
+    }
+    
+    // For desktop, use the regular approach
+    console.log(`[DEBUG] Using standard desktop extraction`);
+    
     const completion = await openai.chat.completions.create({
       model: "deepseek-chat",
       messages: [
@@ -587,45 +722,7 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
           - Ingredient 2 (ONLY actual food items and measurements)
           ## Instructions
           1. Step 1 (ONLY actual cooking steps)
-          2. Step 2 (ONLY actual cooking steps)
-          
-          EXAMPLES OF WHAT NOT TO INCLUDE:
-          - "Log In"
-          - "Search"
-          - "Menu"
-          - "Home"
-          - "About"
-          - "Contact"
-          - "Privacy Policy"
-          - "Terms of Service"
-          - "Subscribe"
-          - "Newsletter"
-          - "Share"
-          - "Print"
-          - "Save"
-          - "Email"
-          - "Pin"
-          - "Tweet"
-          - "Facebook"
-          - "Instagram"
-          - "Twitter"
-          - "Pinterest"
-          - "YouTube"
-          - "TikTok"
-          - "LinkedIn"
-          - "View All"
-          - "Read More"
-          - "See More"
-          - "Show More"
-          - "Load More"
-          - "Next"
-          - "Previous"
-          - "Back"
-          - "Forward"
-          - "Continue"
-          - "Submit"
-          
-          REMEMBER: ONLY extract the actual recipe ingredients and instructions. Nothing else.`
+          2. Step 2 (ONLY actual cooking steps)`
         },
         {
           role: "user",
@@ -635,30 +732,30 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
         }
       ],
       temperature: 0.1,
-      max_tokens: 500, // Very low token count to ensure fast response
+      max_tokens: 1000,
       stream: false
     });
     
-    console.log(`[DEBUG] Received response from DeepSeek API`);
+    console.log(`[DEBUG] Received response from DeepSeek API for desktop`);
     const content = completion.choices[0].message.content || '';
-    console.log(`[DEBUG] Raw content from DeepSeek:\n${content}`);
+    console.log(`[DEBUG] Raw content from DeepSeek for desktop:\n${content}`);
     
     // Parse the markdown content
     const titleMatch = content.match(/# (.*)/);
     const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
-    console.log(`[DEBUG] Extracted title: ${title}`);
+    console.log(`[DEBUG] Extracted title for desktop: ${title}`);
     
     const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
     const ingredients = ingredientsMatch 
       ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i && !i.includes('Log In') && !i.includes('Search'))
       : [];
-    console.log(`[DEBUG] Extracted ingredients: ${JSON.stringify(ingredients)}`);
+    console.log(`[DEBUG] Extracted ingredients for desktop: ${JSON.stringify(ingredients)}`);
     
     const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
     const instructions = instructionsMatch
       ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i && !i.includes('Log In') && !i.includes('Search'))
       : [];
-    console.log(`[DEBUG] Extracted instructions: ${JSON.stringify(instructions)}`);
+    console.log(`[DEBUG] Extracted instructions for desktop: ${JSON.stringify(instructions)}`);
     
     const result = {
       title,
@@ -666,15 +763,9 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       instructions,
       markdown: content,
       original: content,
-      method: isMobile ? 'deepseek-mobile-optimized-v6' : 'deepseek-optimized-v6',
+      method: 'deepseek-desktop-v7',
       url
     };
-    
-    // Cache the result
-    recipeCache.set(cacheKey, {
-      data: result,
-      timestamp: Date.now()
-    });
     
     return result;
   } catch (error) {

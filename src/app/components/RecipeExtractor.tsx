@@ -60,10 +60,26 @@ export default function RecipeExtractor() {
     setRecipe(null);
     setError(null);
 
-    // Check if service worker is registered
+    // Clear service worker caches
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         console.log("Service worker registrations:", registrations);
+        
+        // Unregister all service workers
+        registrations.forEach(registration => {
+          registration.unregister();
+          console.log("Service worker unregistered");
+        });
+        
+        // Clear all caches
+        if ('caches' in window) {
+          caches.keys().then(cacheNames => {
+            cacheNames.forEach(cacheName => {
+              caches.delete(cacheName);
+              console.log("Cache deleted:", cacheName);
+            });
+          });
+        }
       });
     }
   }, []);
@@ -89,35 +105,12 @@ export default function RecipeExtractor() {
       setLoading(true);
       setError(null);
       
-      // Test endpoint first
-      const testEndpoint = '/api/test-endpoint';
-      console.log("Testing endpoint:", testEndpoint);
-
-      try {
-        const testResponse = await fetch(testEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Test-Header': 'test-value'
-          },
-          body: JSON.stringify({ test: true })
-        });
-        
-        const testData = await testResponse.json();
-        console.log("Test endpoint response:", testData);
-      } catch (testError) {
-        console.error("Test endpoint error:", testError);
-      }
-      
       // Log device info for debugging
-      const isMobileDevice = isMobile();
-      console.log("Device info:", { isMobile: isMobileDevice, userAgent: navigator.userAgent });
       console.log("Extracting recipe from URL:", cleanUrl);
       
       // Use a fresh object for the request body
       const requestBody = { 
-        url: cleanUrl, 
-        isMobile: isMobileDevice,  // Still send this for analytics/logging
+        url: cleanUrl,
         timestamp: new Date().toISOString()
       };
       
@@ -126,22 +119,17 @@ export default function RecipeExtractor() {
       
       console.log("About to fetch from endpoint:", endpoint);
       
-      // Add this right before the fetch call
-      console.log("Full endpoint URL:", new URL(endpoint, window.location.origin).toString());
-      
       // And modify the fetch call to log the exact request
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Is-Mobile': isMobileDevice ? 'true' : 'false',
           'X-Debug-Info': 'RecipeExtractor-component'
         },
         body: JSON.stringify(requestBody),
       });
       
       console.log("Response status:", response.status);
-      console.log("Response headers:", Object.fromEntries([...response.headers.entries()]));
       
       // Handle non-OK responses
       if (!response.ok) {
@@ -166,8 +154,8 @@ export default function RecipeExtractor() {
           throw new Error(jsonData.error);
         }
         
-        // Use the markdown property for display
-        setRecipe(jsonData.markdown);
+        // Use the entire JSON object for display
+        setRecipe(jsonData);
       } catch (jsonError) {
         console.error('JSON parsing error:', jsonError);
         // If JSON parsing fails, just use the text directly
@@ -184,219 +172,83 @@ export default function RecipeExtractor() {
   const formatRecipe = (recipe: any) => {
     if (!recipe) return null;
 
-    console.log("Raw recipe data:", typeof recipe, 
-      typeof recipe === 'string' ? recipe.substring(0, 100) : JSON.stringify(recipe).substring(0, 100));
+    console.log("Raw recipe data:", recipe);
 
-    // For mobile, use a simpler display format
-    if (isMobile()) {
-      return (
-        <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
-          <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
-          <div className="mb-4">
-            <button 
-              onClick={() => alert(typeof recipe === 'string' ? recipe : JSON.stringify(recipe, null, 2))}
-              className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
-            >
-              Show Raw Data
-            </button>
-          </div>
-          {typeof recipe === 'string' ? (
-            <div className="whitespace-pre-wrap text-gray-200 text-sm">
-              {recipe.split('\n').map((line, i) => (
-                <p key={i} className="mb-2">{line}</p>
-              ))}
-            </div>
-          ) : (
-            // Handle object format
-            <div className="text-gray-200 text-sm">
-              <h3 className="text-lg font-semibold mb-2">{recipe.title || 'Recipe'}</h3>
-              {recipe.description && <p className="italic mb-4">{recipe.description}</p>}
-              
-              {recipe.ingredients && recipe.ingredients.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="font-medium mb-1">Ingredients:</h4>
-                  <ul className="list-disc pl-5">
-                    {recipe.ingredients.map((ing, i) => (
-                      <li key={i}>{ing}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {recipe.instructions && recipe.instructions.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-1">Instructions:</h4>
-                  <ol className="list-decimal pl-5">
-                    {recipe.instructions.map((step, i) => (
-                      <li key={i} className="mb-2">{step}</li>
-                    ))}
-                  </ol>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // For desktop, use the more complex format
-    try {
-      // Try to parse if it's a string that looks like JSON
-      let parsedRecipe;
-      if (typeof recipe === 'string') {
-        // First, try to handle any potential BOM or invisible characters
-        const cleanedRecipe = recipe.trim().replace(/^\uFEFF/, '');
+    // Ensure we're working with an object
+    let recipeObj;
+    if (typeof recipe === 'string') {
+      try {
+        // Try to parse as JSON first
+        recipeObj = JSON.parse(recipe);
+      } catch (e) {
+        // If it's not JSON, create an object from the markdown
+        const titleMatch = recipe.match(/# (.*)/);
+        const title = titleMatch ? titleMatch[1] : 'Recipe';
         
-        // Check if it starts with { or [ which would indicate JSON
-        if ((cleanedRecipe.startsWith('{') && cleanedRecipe.endsWith('}')) || 
-            (cleanedRecipe.startsWith('[') && cleanedRecipe.endsWith(']'))) {
-          try {
-            parsedRecipe = JSON.parse(cleanedRecipe);
-          } catch (parseError) {
-            console.error("JSON parse error:", parseError);
-            // Create a simple object with the raw text
-            parsedRecipe = {
-              title: "Extracted Recipe",
-              description: "Recipe extracted from URL",
-              instructions: [cleanedRecipe]
-            };
-          }
-        } else {
-          // It's markdown or plain text, create a simple object
-          parsedRecipe = {
-            title: "Extracted Recipe",
-            description: "Recipe extracted from URL",
-            instructions: cleanedRecipe.split('\n').filter(line => line.trim() !== '')
-          };
-        }
-      } else {
-        parsedRecipe = recipe;
+        const ingredientsMatch = recipe.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
+        const ingredients = ingredientsMatch 
+          ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i && !i.includes('Log In') && !i.includes('Search'))
+          : [];
+        
+        const instructionsMatch = recipe.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
+        const instructions = instructionsMatch
+          ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i && !i.includes('Log In') && !i.includes('Search'))
+          : [];
+        
+        recipeObj = {
+          title,
+          ingredients,
+          instructions,
+          markdown: recipe
+        };
       }
-      
-      // Add this simple message at the beginning
-      return (
-        <div className="space-y-6">
-          <div className="bg-red-600 text-white p-4 rounded-lg mb-4">
-            This is a test message to verify the component is updating.
-          </div>
-          
-          <div className="recipe-container bg-gray-900 rounded-xl p-6 shadow-lg">
-            <div className="flex flex-col" style={{ gap: '12px' }}>
-              <h1 className="text-3xl font-bold text-white">{parsedRecipe.title || 'Recipe'}</h1>
-              
-              <button 
-                onClick={() => alert(JSON.stringify(parsedRecipe, null, 2))}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
-              >
-                Show Raw Data
-              </button>
-              
-              {parsedRecipe.description && (
-                <p className="italic text-gray-300">{parsedRecipe.description}</p>
-              )}
-              
-              <div className="flex flex-wrap gap-6 text-gray-300">
-                {parsedRecipe.prepTime && (
-                  <div className="flex items-center gap-2">
-                    <ClockIcon className="w-5 h-5 text-blue-400" />
-                    <span>Prep: {parsedRecipe.prepTime}</span>
-                  </div>
-                )}
-                {parsedRecipe.cookTime && (
-                  <div className="flex items-center gap-2">
-                    <FireIcon className="w-5 h-5 text-orange-400" />
-                    <span>Cook: {parsedRecipe.cookTime}</span>
-                  </div>
-                )}
-                {parsedRecipe.servings && (
-                  <div className="flex items-center gap-2">
-                    <UsersIcon className="w-5 h-5 text-green-400" />
-                    <span>Serves: {parsedRecipe.servings}</span>
-                  </div>
-                )}
-              </div>
-              
-              {parsedRecipe.ingredients && parsedRecipe.ingredients.length > 0 && (
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-1">Ingredients</h2>
-                  <div className="flex flex-col" style={{ gap: '4px' }}>
-                    {Array.isArray(parsedRecipe.ingredients) ? 
-                      parsedRecipe.ingredients.map((ingredient: any, index: number) => {
-                        if (typeof ingredient === 'string' && 
-                            (ingredient.endsWith(':') || ingredient.toUpperCase() === ingredient)) {
-                          return (
-                            <div key={index} className="font-semibold text-white pt-1">
-                              {ingredient}
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={index} className="flex items-start pl-4">
-                            <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mt-2 mr-2"></span>
-                            <span>{ingredient}</span>
-                          </div>
-                        );
-                      }) : 
-                      <div>{parsedRecipe.ingredients}</div>
-                    }
-                  </div>
-                </div>
-              )}
-              
-              {parsedRecipe.instructions && parsedRecipe.instructions.length > 0 && (
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-1">Instructions</h2>
-                  <div className="flex flex-col" style={{ gap: '8px' }}>
-                    {Array.isArray(parsedRecipe.instructions) ?
-                      parsedRecipe.instructions.map((instruction: any, index: number) => {
-                        if (typeof instruction === 'string' && 
-                            (instruction.endsWith(':') || instruction.toUpperCase() === instruction)) {
-                          return (
-                            <div key={index} className="font-semibold text-white pt-1">
-                              {instruction}
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={index} className="flex ml-4">
-                            <span className="font-bold text-blue-400 mr-3 min-w-[20px]">{index + 1}.</span>
-                            <span>{instruction}</span>
-                          </div>
-                        );
-                      }) :
-                      <div>{parsedRecipe.instructions}</div>
-                    }
-                  </div>
-                </div>
-              )}
-              
-              {parsedRecipe.notes && (
-                <div>
-                  <h2 className="text-xl font-semibold text-white mb-1">Notes</h2>
-                  <p className="text-gray-300">{parsedRecipe.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <div className="bg-gray-800 p-4 rounded-lg mt-8">
-            <h3 className="text-lg font-semibold text-white mb-2">Raw Recipe Data (for debugging):</h3>
-            <pre className="text-xs text-gray-300 overflow-auto max-h-96 whitespace-pre-wrap">
-              {JSON.stringify(parsedRecipe, null, 2)}
-            </pre>
-          </div>
-        </div>
-      );
-    } catch (error) {
-      console.error("Error formatting recipe:", error);
-      // Fallback to displaying as text
-      return (
-        <div className="bg-gray-900 rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
-          <pre className="whitespace-pre-wrap text-gray-200">{recipe}</pre>
-        </div>
+    } else {
+      recipeObj = recipe;
+    }
+    
+    // Filter out any navigation elements that might have slipped through
+    if (recipeObj.ingredients) {
+      recipeObj.ingredients = recipeObj.ingredients.filter((ing: string) => 
+        ing && 
+        !ing.includes('Log In') && 
+        !ing.includes('Search') && 
+        !ing.includes('Menu') &&
+        !ing.includes('Home')
       );
     }
+    
+    // Now render the recipe with the filtered data
+    return (
+      <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+        <h2 className="text-xl font-bold text-white mb-4">{recipeObj.title || 'Extracted Recipe'}</h2>
+        
+        {recipeObj.ingredients && recipeObj.ingredients.length > 0 && (
+          <div className="mb-4">
+            <h4 className="font-medium mb-1 text-white">Ingredients:</h4>
+            <ul className="list-disc pl-5 text-gray-200">
+              {recipeObj.ingredients.map((ing: string, i: number) => (
+                <li key={i}>{ing}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        
+        {recipeObj.instructions && recipeObj.instructions.length > 0 && (
+          <div>
+            <h4 className="font-medium mb-1 text-white">Instructions:</h4>
+            <ol className="list-decimal pl-5 text-gray-200">
+              {recipeObj.instructions.map((step: string, i: number) => (
+                <li key={i} className="mb-2">{step}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+        
+        <div className="mt-4 pt-4 border-t border-gray-700">
+          <p className="text-gray-400 text-sm">Extraction method: {recipeObj.method || 'unknown'}</p>
+        </div>
+      </div>
+    );
   };
 
   const clearError = () => {
@@ -429,17 +281,7 @@ export default function RecipeExtractor() {
           <p className="text-gray-300">Extracting recipe...</p>
         </div>
       ) : recipe ? (
-        <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
-          <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
-          <div className="whitespace-pre-wrap text-gray-200 text-sm">
-            {typeof recipe === 'string' ? 
-              recipe.split('\n').map((line, i) => (
-                <p key={i} className="mb-2">{line}</p>
-              )) : 
-              JSON.stringify(recipe, null, 2)
-            }
-          </div>
-        </div>
+        formatRecipe(recipe)
       ) : null}
     </div>
   );
