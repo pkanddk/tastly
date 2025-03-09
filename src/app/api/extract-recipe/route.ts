@@ -29,19 +29,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
     
-    // Add a shorter timeout for the fetch operation on mobile
+    // Fetch the page content with timeout protection
     const fetchTimeout = isMobile ? 8000 : 10000; // 8 seconds for mobile, 10 for desktop
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), fetchTimeout);
     
-    // Reduce the prompt size for mobile
-    const contentLimit = isMobile ? 10000 : 15000;
-    const bodyContentTrimmed = bodyContent.substring(0, contentLimit);
-    
-    // Reduce max_tokens for mobile to speed up processing
-    const maxTokens = isMobile ? 2000 : 4000;
-    
-    // Fetch the page content with timeout protection
+    // Fetch the page content
     const response = await fetch(url, { 
       signal: controller.signal,
       headers: {
@@ -69,6 +62,11 @@ export async function POST(req: NextRequest) {
     
     // Extract the main content
     const bodyContent = $('body').text();
+    
+    // Define content limit and max tokens based on device type
+    const contentLimit = isMobile ? 10000 : 15000;
+    const bodyContentTrimmed = bodyContent.substring(0, contentLimit);
+    const maxTokens = isMobile ? 2000 : 4000;
     
     // Prepare the prompt for Deepseek
     const prompt = `

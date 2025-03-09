@@ -50,7 +50,8 @@ export default function TestProduction() {
         setResult(data);
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
-        setError(`Failed to parse JSON: ${rawResponse.substring(0, 100)}...`);
+        console.error("Raw response that failed to parse:", rawResponse);
+        setError(`Failed to parse JSON: ${rawResponse.substring(0, 200)}...`);
       }
       
     } catch (err) {
