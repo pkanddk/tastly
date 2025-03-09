@@ -44,6 +44,13 @@ export default function RecipeExtractor() {
     setUrl('');
     setRecipe(null);
     setError(null);
+
+    // Check if service worker is registered
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        console.log("Service worker registrations:", registrations);
+      });
+    }
   }, []);
 
   const handleExtract = async () => {
@@ -67,6 +74,26 @@ export default function RecipeExtractor() {
       setLoading(true);
       setError(null);
       
+      // Test endpoint first
+      const testEndpoint = '/api/test-endpoint';
+      console.log("Testing endpoint:", testEndpoint);
+
+      try {
+        const testResponse = await fetch(testEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Test-Header': 'test-value'
+          },
+          body: JSON.stringify({ test: true })
+        });
+        
+        const testData = await testResponse.json();
+        console.log("Test endpoint response:", testData);
+      } catch (testError) {
+        console.error("Test endpoint error:", testError);
+      }
+      
       // Log device info for debugging
       const isMobileDevice = isMobile();
       console.log("Device info:", { isMobile: isMobileDevice, userAgent: navigator.userAgent });
@@ -84,14 +111,24 @@ export default function RecipeExtractor() {
         ? '/api/extract-recipe-mobile' 
         : '/api/extract-recipe';
       
+      console.log("About to fetch from endpoint:", endpoint);
+      
+      // Add this right before the fetch call
+      console.log("Full endpoint URL:", new URL(endpoint, window.location.origin).toString());
+      
+      // And modify the fetch call to log the exact request
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Is-Mobile': isMobileDevice ? 'true' : 'false'
+          'X-Is-Mobile': isMobileDevice ? 'true' : 'false',
+          'X-Debug-Info': 'RecipeExtractor-component'
         },
         body: JSON.stringify(requestBody),
       });
+      
+      console.log("Response status:", response.status);
+      console.log("Response headers:", Object.fromEntries([...response.headers.entries()]));
       
       // Handle non-OK responses
       if (!response.ok) {

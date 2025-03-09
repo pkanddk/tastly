@@ -36,8 +36,11 @@ const nextConfig = {
     },
   },
   functions: {
-    'api/deepseek/extract-recipe': {
+    'api/extract-recipe': {
       maxDuration: 60,
+    },
+    'api/extract-recipe-mobile': {
+      maxDuration: 30,
     },
   },
 };
