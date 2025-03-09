@@ -11,8 +11,18 @@ const openai = new OpenAI({
 export async function POST(req: NextRequest) {
   try {
     console.log("extract-recipe API route called with URL:", req.url);
-    console.log("Request headers:", Object.fromEntries([...req.headers.entries()]));
-
+    
+    // Log user agent and mobile header
+    const userAgent = req.headers.get('user-agent') || '';
+    const isMobileHeader = req.headers.get('X-Is-Mobile') || 'false';
+    console.log("Request user agent:", userAgent);
+    console.log("Is mobile header:", isMobileHeader);
+    
+    // Check if it's a mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) || 
+                     isMobileHeader === 'true';
+    console.log("Detected as mobile:", isMobile);
+    
     const { url } = await req.json();
     
     if (!url) {
@@ -108,9 +118,24 @@ export async function POST(req: NextRequest) {
     // Direct fix for the specific pattern
     const cleanedContent = recipeContent.replace(/^```markdown\s*/i, '').replace(/```$/m, '').replace(/'''/g, '');
 
+    // Check if the request is using HTTPS
+    if (req.headers.get('x-forwarded-proto') !== 'https' && process.env.NODE_ENV === 'production') {
+      // Redirect to HTTPS
+      return NextResponse.redirect(
+        `https://${req.headers.get('host')}${req.nextUrl.pathname}${req.nextUrl.search}`,
+        301
+      );
+    }
+
     return NextResponse.json({ 
       markdown: cleanedContent,
       original: recipeContent
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
     
   } catch (error: any) {
