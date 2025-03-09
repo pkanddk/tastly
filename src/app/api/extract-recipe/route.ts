@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import OpenAI from 'openai';
+import { extractRecipe } from '@/app/lib/server/recipeExtractor';
 
 // Initialize OpenAI client with the Deepseek API
 const openai = new OpenAI({
@@ -29,6 +30,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
     
+    // First, try the simplified extraction method
+    try {
+      console.log("Attempting simplified extraction method first");
+      const recipe = await extractRecipe(url, isMobile);
+      
+      // If we got a reasonable amount of ingredients and instructions, return the result
+      if (recipe.ingredients.length > 0 && recipe.instructions.length > 0) {
+        console.log("Simplified extraction successful");
+        return NextResponse.json({ 
+          ...recipe,
+          method: 'simple'
+        }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          }
+        });
+      }
+      
+      console.log("Simplified extraction didn't find enough content, trying DeepSeek API");
+    } catch (simpleError) {
+      console.error("Simplified extraction failed:", simpleError);
+      console.log("Falling back to DeepSeek API");
+    }
+    
+    // If simplified extraction failed or didn't find enough content, try DeepSeek API
     // Fetch the page content with timeout protection
     const fetchTimeout = isMobile ? 8000 : 10000; // 8 seconds for mobile, 10 for desktop
     const controller = new AbortController();
@@ -186,7 +214,8 @@ ${instructions.map((inst, i) => `${i+1}. ${inst}`).join('\n')}
 
     return NextResponse.json({ 
       markdown: cleanedContent,
-      original: recipeContent
+      original: recipeContent,
+      method: 'deepseek'
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

@@ -37,7 +37,7 @@ const nextConfig = {
   },
   functions: {
     'api/extract-recipe': {
-      maxDuration: 120,
+      maxDuration: 300,
     },
   },
 };

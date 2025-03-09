@@ -1,6 +1,7 @@
 // This file should only be imported in server components or API routes
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
+import * as cheerio from 'cheerio';
 
 // Simple in-memory cache
 const recipeCache = new Map<string, { data: any, timestamp: number }>();
@@ -211,6 +212,128 @@ export async function extractRecipeSimple(url: string) {
     return result;
   } catch (error) {
     console.error("Simple DeepSeek extraction error:", error);
+    throw error;
+  }
+}
+
+export async function extractRecipe(url: string, isMobile: boolean = false) {
+  try {
+    console.log(`Extracting recipe from ${url} (mobile: ${isMobile})`);
+    
+    // Set a reasonable timeout for the fetch operation
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
+    // Fetch the page content
+    const response = await fetch(url, { 
+      signal: controller.signal,
+      headers: {
+        'User-Agent': isMobile 
+          ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1'
+          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    }
+    
+    const html = await response.text();
+    
+    // Use Cheerio to parse the HTML
+    const $ = cheerio.load(html);
+    
+    // Remove script tags, style tags, and comments to clean up the HTML
+    $('script, style, comment').remove();
+    
+    // Get the page title
+    const title = $('h1').first().text() || $('title').text() || 'Recipe';
+    
+    // Extract ingredients
+    const ingredients: string[] = [];
+    
+    // Look for common ingredient patterns
+    $('ul li').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 3 && text.length < 200) {
+        ingredients.push(text);
+      }
+    });
+    
+    // Also look for ingredients in other common patterns
+    $('.ingredients, .ingredient-list, [itemprop="recipeIngredient"]').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text && !ingredients.includes(text) && text.length < 200) {
+        ingredients.push(text);
+      }
+    });
+    
+    // Extract instructions
+    const instructions: string[] = [];
+    
+    // Look for common instruction patterns
+    $('ol li').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 10) {
+        instructions.push(text);
+      }
+    });
+    
+    // Also look for instructions in other common patterns
+    $('.instructions, .direction-list, [itemprop="recipeInstructions"]').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text && !instructions.includes(text) && text.length > 10) {
+        instructions.push(text);
+      }
+    });
+    
+    // Extract cooking time and servings
+    let cookingTime = '';
+    let servings = '';
+    
+    $('[itemprop="totalTime"], .recipe-time, .cook-time').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text) cookingTime = text;
+    });
+    
+    $('[itemprop="recipeYield"], .recipe-yield, .servings').each((i, el) => {
+      const text = $(el).text().trim();
+      if (text) servings = text;
+    });
+    
+    // Create a simple markdown recipe
+    const simpleRecipe = `
+# ${title}
+
+${cookingTime ? `## Cooking Time\n${cookingTime}\n\n` : ''}
+${servings ? `## Servings\n${servings}\n\n` : ''}
+
+## Ingredients
+${ingredients.length > 0 
+  ? ingredients.map(ing => `- ${ing}`).join('\n')
+  : '- No ingredients found. Please check the original recipe.'}
+
+## Instructions
+${instructions.length > 0
+  ? instructions.map((inst, i) => `${i+1}. ${inst}`).join('\n')
+  : '- No instructions found. Please check the original recipe.'}
+    `.trim();
+    
+    return {
+      title,
+      ingredients,
+      instructions,
+      cookingTime,
+      servings,
+      markdown: simpleRecipe,
+      original: simpleRecipe,
+      method: 'simple'
+    };
+    
+  } catch (error) {
+    console.error('Error in recipe extraction:', error);
     throw error;
   }
 } 
