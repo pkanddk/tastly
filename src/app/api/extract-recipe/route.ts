@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractRecipe, extractRecipeWithDeepSeekMobile } from '@/app/lib/server/recipeExtractor';
+import { extractRecipe, extractRecipeWithDeepSeekOptimized } from '@/app/lib/server/recipeExtractor';
 import OpenAI from 'openai';
 
 export async function POST(req: NextRequest) {
@@ -26,65 +26,11 @@ export async function POST(req: NextRequest) {
     let recipe;
     
     try {
-      if (isMobile) {
-        // Use the optimized mobile implementation for mobile devices
-        console.log("Using mobile-optimized DeepSeek extraction");
-        recipe = await extractRecipeWithDeepSeekMobile(url);
-      } else {
-        // Use the regular DeepSeek implementation for desktop
-        console.log("Using regular DeepSeek extraction");
-        
-        // Initialize DeepSeek client
-        const openai = new OpenAI({
-          apiKey: process.env.DEEPSEEK_API_KEY || '',
-          baseURL: 'https://api.deepseek.com',
-        });
-        
-        const completion = await openai.chat.completions.create({
-          model: "deepseek-chat",
-          messages: [
-            {
-              role: "system",
-              content: "Extract recipes from URLs. Format as markdown with # Title, ## Ingredients as a list, and ## Instructions as numbered steps."
-            },
-            {
-              role: "user",
-              content: `Extract the complete recipe from this URL: ${url}`
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 2000,
-          stream: false
-        });
-        
-        const content = completion.choices[0].message.content || '';
-        
-        // Parse the markdown content
-        const titleMatch = content.match(/# (.*)/);
-        const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
-        
-        const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
-        const ingredients = ingredientsMatch 
-          ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
-          : [];
-        
-        const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
-        const instructions = instructionsMatch
-          ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i)
-          : [];
-        
-        recipe = {
-          title,
-          ingredients,
-          instructions,
-          markdown: content,
-          original: content,
-          method: 'deepseek',
-          url
-        };
-      }
+      // Use the optimized extraction for both mobile and desktop
+      console.log("Using optimized DeepSeek extraction");
+      recipe = await extractRecipeWithDeepSeekOptimized(url, isMobile);
     } catch (deepseekError) {
-      console.error("DeepSeek extraction failed:", deepseekError);
+      console.error("Optimized DeepSeek extraction failed:", deepseekError);
       
       // Fall back to the simple extraction method
       console.log("Falling back to simple extraction");

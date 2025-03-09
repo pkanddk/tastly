@@ -609,7 +609,28 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       if (!relevantContent.trim() || relevantContent.length > 10000) {
         // For AllRecipes.com
         if (url.includes('allrecipes.com')) {
-          relevantContent = $('.recipe-shopper-wrapper, .recipe-content, .ingredients-section, .instructions-section').text();
+          // For AllRecipes.com, target only the specific recipe content sections
+          const ingredientsList = $('.ingredients-section .ingredients-item-name');
+          if (ingredientsList.length > 0) {
+            relevantContent = "Ingredients:\n";
+            ingredientsList.each((i, el) => {
+              relevantContent += $(el).text().trim() + "\n";
+            });
+            relevantContent += "\n";
+          }
+          
+          const instructionsList = $('.instructions-section .section-body');
+          if (instructionsList.length > 0) {
+            relevantContent += "Instructions:\n";
+            instructionsList.find('p').each((i, el) => {
+              relevantContent += (i+1) + ". " + $(el).text().trim() + "\n";
+            });
+          }
+          
+          // If we couldn't find the specific elements, try a more general approach
+          if (relevantContent.trim().length < 100) {
+            relevantContent = $('.recipe-container, .recipe-content, .ingredients-section, .instructions-section').text();
+          }
         }
         // For Food Network
         else if (url.includes('foodnetwork.com')) {
