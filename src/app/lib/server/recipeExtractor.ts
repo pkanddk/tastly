@@ -220,6 +220,16 @@ export async function extractRecipe(url: string, isMobile: boolean = false) {
   try {
     console.log(`Extracting recipe from ${url} (mobile: ${isMobile})`);
     
+    // Generate a cache key based on the URL and device type
+    const cacheKey = `${url}:${isMobile ? 'mobile' : 'desktop'}`;
+    
+    // Check if we have a cached result that's not expired
+    const cachedItem = recipeCache.get(cacheKey);
+    if (cachedItem && (Date.now() - cachedItem.timestamp) < CACHE_TTL) {
+      console.log("Using cached recipe for:", url);
+      return cachedItem.data;
+    }
+    
     // Set a reasonable timeout for the fetch operation
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -249,7 +259,7 @@ export async function extractRecipe(url: string, isMobile: boolean = false) {
     $('script, style, comment').remove();
     
     // Get the page title
-    const title = $('h1').first().text() || $('title').text() || 'Recipe';
+    const title = $('h1').first().text().trim() || $('title').text().trim() || 'Recipe';
     
     // Extract ingredients
     const ingredients: string[] = [];
@@ -263,7 +273,7 @@ export async function extractRecipe(url: string, isMobile: boolean = false) {
     });
     
     // Also look for ingredients in other common patterns
-    $('.ingredients, .ingredient-list, [itemprop="recipeIngredient"]').each((i, el) => {
+    $('.ingredients, .ingredient-list, [itemprop="recipeIngredient"], [class*="ingredient"]').each((i, el) => {
       const text = $(el).text().trim();
       if (text && !ingredients.includes(text) && text.length < 200) {
         ingredients.push(text);
@@ -282,7 +292,7 @@ export async function extractRecipe(url: string, isMobile: boolean = false) {
     });
     
     // Also look for instructions in other common patterns
-    $('.instructions, .direction-list, [itemprop="recipeInstructions"]').each((i, el) => {
+    $('.instructions, .direction-list, [itemprop="recipeInstructions"], [class*="instruction"], [class*="direction"]').each((i, el) => {
       const text = $(el).text().trim();
       if (text && !instructions.includes(text) && text.length > 10) {
         instructions.push(text);
@@ -293,15 +303,44 @@ export async function extractRecipe(url: string, isMobile: boolean = false) {
     let cookingTime = '';
     let servings = '';
     
-    $('[itemprop="totalTime"], .recipe-time, .cook-time').each((i, el) => {
+    $('[itemprop="totalTime"], .recipe-time, .cook-time, [class*="time"]').each((i, el) => {
       const text = $(el).text().trim();
-      if (text) cookingTime = text;
+      if (text && text.length < 100) cookingTime = text;
     });
     
-    $('[itemprop="recipeYield"], .recipe-yield, .servings').each((i, el) => {
+    $('[itemprop="recipeYield"], .recipe-yield, .servings, [class*="yield"], [class*="serving"]').each((i, el) => {
       const text = $(el).text().trim();
-      if (text) servings = text;
+      if (text && text.length < 100) servings = text;
     });
+    
+    // If we didn't find enough ingredients or instructions, try a more aggressive approach
+    if (ingredients.length < 3 || instructions.length < 2) {
+      console.log("Not enough content found, trying more aggressive extraction");
+      
+      // Look for any list items that might be ingredients
+      $('li').each((i, el) => {
+        const text = $(el).text().trim();
+        if (text && text.length > 3 && text.length < 200 && !ingredients.includes(text)) {
+          // Check if it looks like an ingredient (contains measurements or food items)
+          if (/\d+\s*(cup|tbsp|tsp|oz|g|kg|ml|l|pound|teaspoon|tablespoon)/i.test(text) || 
+              /salt|pepper|sugar|flour|oil|butter|garlic|onion|chicken|beef|pork|fish/i.test(text)) {
+            ingredients.push(text);
+          }
+        }
+      });
+      
+      // Look for paragraphs that might be instructions
+      $('p').each((i, el) => {
+        const text = $(el).text().trim();
+        if (text && text.length > 20 && text.length < 500 && !instructions.includes(text)) {
+          // Check if it looks like an instruction (starts with action verbs or numbers)
+          if (/^(preheat|mix|stir|add|combine|heat|cook|bake|roast|grill|simmer|boil|fry)/i.test(text) ||
+              /^\d+\.?\s+/i.test(text)) {
+            instructions.push(text);
+          }
+        }
+      });
+    }
     
     // Create a simple markdown recipe
     const simpleRecipe = `
@@ -321,7 +360,7 @@ ${instructions.length > 0
   : '- No instructions found. Please check the original recipe.'}
     `.trim();
     
-    return {
+    const result = {
       title,
       ingredients,
       instructions,
@@ -329,8 +368,17 @@ ${instructions.length > 0
       servings,
       markdown: simpleRecipe,
       original: simpleRecipe,
-      method: 'simple'
+      method: 'simple',
+      url
     };
+    
+    // Cache the result
+    recipeCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+    
+    return result;
     
   } catch (error) {
     console.error('Error in recipe extraction:', error);

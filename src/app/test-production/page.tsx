@@ -100,6 +100,15 @@ export default function TestProduction() {
         <div className="mt-4">
           <h2 className="text-xl font-semibold mb-2">Result:</h2>
           <div className="bg-gray-100 p-4 rounded mb-4">
+            <h3 className="font-medium mb-2">Extraction Method: <span className="text-blue-600">{result.method}</span></h3>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="font-medium">Ingredients Found: <span className="text-blue-600">{result.ingredients?.length || 0}</span></p>
+              </div>
+              <div>
+                <p className="font-medium">Instructions Found: <span className="text-blue-600">{result.instructions?.length || 0}</span></p>
+              </div>
+            </div>
             <h3 className="font-medium mb-2">Markdown Content:</h3>
             <div className="whitespace-pre-wrap bg-white p-3 border rounded text-sm">
               {result.markdown}
