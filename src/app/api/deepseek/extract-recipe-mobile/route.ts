@@ -5,7 +5,10 @@ export async function POST(request: NextRequest) {
     const { url } = await request.json();
     
     if (!url) {
-      return new NextResponse("URL is required", { status: 400 });
+      return NextResponse.json(
+        { error: 'URL is required' },
+        { status: 400 }
+      );
     }
     
     // Validate the URL
@@ -13,24 +16,25 @@ export async function POST(request: NextRequest) {
     try {
       validatedUrl = new URL(url).toString();
     } catch (e) {
-      return new NextResponse("Invalid URL format", { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid URL format' },
+        { status: 400 }
+      );
     }
     
-    // Return a simple message with the URL
-    return new NextResponse(`
-# Recipe from: ${validatedUrl}
-
-We're currently optimizing our mobile recipe extraction.
-Please try using our desktop version for full recipe details,
-or visit the original website directly.
-    `, {
-      headers: { 'Content-Type': 'text/plain' }
+    // Return a simple message with the URL in the structured format
+    return NextResponse.json({
+      markdown: `# Recipe from: ${validatedUrl}\n\nWe're currently optimizing our mobile recipe extraction.\nPlease try using our desktop version for full recipe details,\nor visit the original website directly.`,
+      original: null
     });
     
   } catch (error) {
     console.error('Error in mobile recipe extraction:', error);
-    return new NextResponse(
-      `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    return NextResponse.json(
+      { 
+        error: error instanceof Error ? error.message : 'An unknown error occurred',
+        markdown: `An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`
+      },
       { status: 500 }
     );
   }

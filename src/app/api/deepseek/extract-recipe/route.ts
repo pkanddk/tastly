@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractRecipeWithAI, extractRecipeSimple } from '@/app/lib/server/recipeExtractor';
+import { extractRecipeWithAI } from '@/app/lib/server/recipeExtractor';
 
 export async function POST(request: NextRequest) {
   try {
-    const { url, isMobile, debug } = await request.json();
+    const { url, isMobile } = await request.json();
     const userAgent = request.headers.get('user-agent') || '';
     const isMobileHeader = request.headers.get('X-Is-Mobile');
     
@@ -11,12 +11,8 @@ export async function POST(request: NextRequest) {
       url, 
       isMobile, 
       isMobileHeader,
-      debug,
       userAgent: userAgent.substring(0, 100) 
     });
-    
-    console.log("Request headers:", Object.fromEntries(request.headers.entries()));
-    console.log("Request body:", { url, isMobile, debug });
     
     if (!url) {
       return NextResponse.json(
@@ -29,14 +25,6 @@ export async function POST(request: NextRequest) {
     let validatedUrl;
     try {
       validatedUrl = new URL(url).toString();
-      console.log("Validated URL:", validatedUrl);
-      console.log("URL validation result:", {
-        original: url,
-        validated: validatedUrl,
-        protocol: new URL(validatedUrl).protocol,
-        hostname: new URL(validatedUrl).hostname,
-        pathname: new URL(validatedUrl).pathname
-      });
     } catch (e) {
       return NextResponse.json(
         { error: 'Invalid URL format' },
@@ -44,87 +32,39 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // If debug mode is enabled, return detailed information
-    if (debug) {
-      return NextResponse.json({
-        message: "Debug mode enabled",
-        requestInfo: {
-          url: validatedUrl,
-          isMobile,
-          userAgent: userAgent.substring(0, 100),
-          headers: Object.fromEntries(request.headers.entries()),
-        }
-      });
-    }
-    
     try {
-      // For mobile, use the simple extraction to avoid timeouts
-      if (isMobile) {
-        try {
-          console.log("Using simple extraction for mobile");
-          
-          // Set a timeout for the extraction
-          const extractionPromise = extractRecipeSimple(validatedUrl);
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error("Extraction timed out")), 15000); // Increased from 8 to 15 seconds
-          });
-          
-          // Race the extraction against the timeout
-          const simpleRecipe = await Promise.race([
-            extractionPromise,
-            timeoutPromise
-          ]) as string;
-          
-          return new NextResponse(simpleRecipe, {
-            headers: { 'Content-Type': 'text/plain' }
-          });
-        } catch (simpleError) {
-          console.error("Simple extraction failed:", simpleError);
-          
-          // Return a very basic fallback that won't cause parsing issues
-          return new NextResponse(`
-# Recipe from: ${validatedUrl}
-
-We couldn't extract the full recipe details automatically.
-Please visit the original website for the complete recipe.
-
-Error: ${simpleError instanceof Error ? simpleError.message : 'Unknown error'}
-          `, {
-            headers: { 'Content-Type': 'text/plain' }
-          });
-        }
-      }
-      
-      // For desktop, use the AI extraction with timeout
+      // Use the AI extraction with timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 50000);
       
       try {
-        const recipeData = await extractRecipeWithAI(validatedUrl, false);
+        const recipeContent = await extractRecipeWithAI(validatedUrl, !!isMobile);
         clearTimeout(timeoutId);
         
-        // Return JSON if it's an object, otherwise plain text
-        if (typeof recipeData === 'object') {
-          return NextResponse.json(recipeData);
-        } else {
-          return new NextResponse(recipeData, {
-            headers: { 'Content-Type': 'text/plain' }
-          });
-        }
-      } catch (abortError) {
+        // Clean markdown formatting tags
+        const cleanedContent = typeof recipeContent === 'string' 
+          ? recipeContent
+              .replace(/^```markdown\s*/i, '')
+              .replace(/```$/m, '')
+              .replace(/'''/g, '')
+          : recipeContent;
+        
+        // Return a structured JSON response
+        return NextResponse.json({ 
+          markdown: cleanedContent,
+          original: recipeContent
+        });
+      } catch (abortError: any) {
         if (abortError.name === 'AbortError') {
           console.error("Extraction timed out");
           // Return a timeout-specific message
-          if (isMobile) {
-            return new NextResponse(`
-Recipe from: ${validatedUrl}
-
-The recipe extraction is taking longer than expected.
-Please try again or visit the original website for the recipe.
-            `, {
-              headers: { 'Content-Type': 'text/plain' }
-            });
-          }
+          return NextResponse.json(
+            { 
+              error: 'Recipe extraction timed out',
+              markdown: `# Recipe from: ${validatedUrl}\n\nThe recipe extraction is taking longer than expected.\nPlease try again or visit the original website for the recipe.`
+            },
+            { status: 408 }
+          );
         }
         throw abortError; // Re-throw other errors
       }
@@ -132,23 +72,10 @@ Please try again or visit the original website for the recipe.
       console.error("Extraction error:", error);
       
       // Provide a fallback for failed extractions
-      if (isMobile) {
-        return new NextResponse(`
-Recipe from: ${validatedUrl}
-
-We couldn't extract the full recipe details automatically.
-Please visit the original website for the complete recipe.
-
-Error: ${error instanceof Error ? error.message : 'Unknown error'}
-        `, {
-          headers: { 'Content-Type': 'text/plain' }
-        });
-      }
-      
       return NextResponse.json(
         { 
-          error: error instanceof Error ? error.message : 'An unknown error occurred',
-          url: validatedUrl
+          error: error instanceof Error ? error.message : 'Failed to extract recipe',
+          markdown: `# Recipe from: ${validatedUrl}\n\nWe couldn't extract the full recipe details automatically.\nPlease visit the original website for the complete recipe.\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}`
         },
         { status: 500 }
       );
