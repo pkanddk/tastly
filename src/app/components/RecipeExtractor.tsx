@@ -99,13 +99,18 @@ export default function RecipeExtractor() {
         throw new Error(`Failed to extract recipe: ${response.status}`);
       }
       
-      // Always get the response as text first
-      const responseText = await response.text();
-      console.log("Raw response text:", responseText.substring(0, 100));
+      // Check the content type to determine how to handle the response
+      const contentType = response.headers.get('Content-Type');
       
-      // Set the recipe directly without any parsing
-      setRecipe(responseText);
-      
+      if (contentType && contentType.includes('application/json')) {
+        // It's JSON, parse it
+        const jsonData = await response.json();
+        setRecipe(jsonData);
+      } else {
+        // It's not JSON, treat it as text
+        const textData = await response.text();
+        setRecipe(textData);
+      }
     } catch (err) {
       console.error('Extraction error:', err);
       setError(`Failed to extract recipe. ${err instanceof Error ? err.message : 'Please try a different URL.'}`);
@@ -364,14 +369,42 @@ export default function RecipeExtractor() {
       ) : recipe ? (
         <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
           <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
-          <div className="whitespace-pre-wrap text-gray-200 text-sm">
-            {typeof recipe === 'string' ? 
-              recipe.split('\n').map((line, i) => (
+          {typeof recipe === 'string' ? (
+            // Handle string recipes (plain text or markdown)
+            <div className="whitespace-pre-wrap text-gray-200 text-sm">
+              {recipe.split('\n').map((line, i) => (
                 <p key={i} className="mb-2">{line}</p>
-              )) : 
-              JSON.stringify(recipe, null, 2)
-            }
-          </div>
+              ))}
+            </div>
+          ) : (
+            // Handle object recipes (JSON)
+            <div className="text-gray-200 text-sm">
+              <h3 className="text-lg font-semibold mb-2">{recipe.title || 'Recipe'}</h3>
+              {recipe.description && <p className="italic mb-4">{recipe.description}</p>}
+              
+              {recipe.ingredients && recipe.ingredients.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-medium mb-1">Ingredients:</h4>
+                  <ul className="list-disc pl-5">
+                    {recipe.ingredients.map((ing: any, i: number) => (
+                      <li key={i}>{ing}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {recipe.instructions && recipe.instructions.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-1">Instructions:</h4>
+                  <ol className="list-decimal pl-5">
+                    {recipe.instructions.map((step: any, i: number) => (
+                      <li key={i} className="mb-2">{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : null}
     </div>

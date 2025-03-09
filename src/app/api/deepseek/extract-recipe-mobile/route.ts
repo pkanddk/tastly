@@ -16,12 +16,13 @@ export async function POST(request: NextRequest) {
       return new NextResponse("Invalid URL format", { status: 400 });
     }
     
-    // Return a simple fallback message
+    // Return a simple message with the URL
     return new NextResponse(`
 # Recipe from: ${validatedUrl}
 
-We're currently experiencing high demand.
-Please try again later or visit the original website for the recipe.
+We're currently optimizing our mobile recipe extraction.
+Please try using our desktop version for full recipe details,
+or visit the original website directly.
     `, {
       headers: { 'Content-Type': 'text/plain' }
     });
