@@ -43,12 +43,22 @@ export default function RecipeExtractor() {
       setLoading(true);
       setError(null);
       
+      // Log device info for debugging
+      const isMobileDevice = isMobile();
+      console.log("Device info:", { isMobile: isMobileDevice, userAgent: navigator.userAgent });
+      
       const response = await fetch('/api/deepseek/extract-recipe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // Add mobile flag to help with debugging
+          'X-Is-Mobile': isMobileDevice ? 'true' : 'false'
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ 
+          url, 
+          isMobile: isMobileDevice,
+          timestamp: new Date().toISOString() // Add timestamp to prevent caching
+        }),
       });
       
       if (!response.ok) {

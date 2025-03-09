@@ -3,7 +3,7 @@ import { extractRecipeFromUrl } from '@/app/lib/deepseek';
 
 export async function POST(request: NextRequest) {
   try {
-    const { url, isMobile } = await request.json();
+    const { url, isMobile, debug } = await request.json();
     const userAgent = request.headers.get('user-agent') || '';
     const isMobileHeader = request.headers.get('X-Is-Mobile');
     
@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
       url, 
       isMobile, 
       isMobileHeader,
+      debug,
       userAgent: userAgent.substring(0, 100) 
     });
     
@@ -19,6 +20,19 @@ export async function POST(request: NextRequest) {
         { error: 'URL is required' },
         { status: 400 }
       );
+    }
+    
+    // If debug mode is enabled, return detailed information
+    if (debug) {
+      return NextResponse.json({
+        message: "Debug mode enabled",
+        requestInfo: {
+          url,
+          isMobile,
+          userAgent: userAgent.substring(0, 100),
+          headers: Object.fromEntries(request.headers.entries()),
+        }
+      });
     }
     
     console.log("Extracting recipe from URL:", url);
