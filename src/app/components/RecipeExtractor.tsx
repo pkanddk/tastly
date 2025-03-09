@@ -43,7 +43,6 @@ export default function RecipeExtractor() {
       setLoading(true);
       setError(null);
       
-      // Use a more robust approach to fetch the recipe
       const response = await fetch('/api/deepseek/extract-recipe', {
         method: 'POST',
         headers: {
@@ -53,6 +52,8 @@ export default function RecipeExtractor() {
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API error:', response.status, errorText);
         throw new Error(`Failed to extract recipe: ${response.status}`);
       }
       
@@ -68,8 +69,8 @@ export default function RecipeExtractor() {
       console.log("Extracted recipe type:", typeof extractedRecipe);
       setRecipe(extractedRecipe);
     } catch (err) {
-      setError('Failed to extract recipe. Please try a different URL.');
-      console.error(err);
+      console.error('Extraction error:', err);
+      setError(`Failed to extract recipe. ${err instanceof Error ? err.message : 'Please try a different URL.'}`);
     } finally {
       setLoading(false);
     }

@@ -7,6 +7,7 @@ export async function extractRecipeFromUrl(url: string) {
   console.log(`Running in ${isProd ? 'production' : 'development'} environment`);
 
   try {
+    // Make sure this is the correct endpoint path
     const response = await fetch('/api/deepseek/extract-recipe', {
       method: 'POST',
       headers: {
@@ -14,6 +15,13 @@ export async function extractRecipeFromUrl(url: string) {
       },
       body: JSON.stringify({ url }),
     });
+
+    // Handle non-OK responses properly
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API error:', response.status, errorText);
+      throw new Error(`Failed to extract recipe: ${response.status} ${errorText.substring(0, 50)}...`);
+    }
 
     const contentType = response.headers.get('Content-Type');
     
