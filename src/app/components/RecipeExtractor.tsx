@@ -98,26 +98,28 @@ export default function RecipeExtractor() {
         throw new Error(`Failed to extract recipe: ${response.status}`);
       }
       
-      const contentType = response.headers.get('Content-Type');
-      console.log("Response content type:", contentType);
+      // Always get the response as text first
+      const responseText = await response.text();
+      console.log("Raw response text:", responseText.substring(0, 100));
       
-      // For mobile devices, always treat the response as text
+      // For mobile devices, always use the text directly
       if (isMobileDevice) {
-        const textResponse = await response.text();
-        console.log("Mobile text response:", textResponse.substring(0, 100));
-        setRecipe(textResponse);
+        setRecipe(responseText);
         return;
       }
       
-      // For desktop, try to parse as JSON if appropriate
-      if (contentType?.includes('application/json')) {
-        const jsonResponse = await response.json();
-        console.log("JSON response:", jsonResponse);
-        setRecipe(jsonResponse);
-      } else {
-        const textResponse = await response.text();
-        console.log("Text response:", textResponse.substring(0, 100));
-        setRecipe(textResponse);
+      // For desktop, try to parse as JSON if it looks like JSON
+      try {
+        if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+          const jsonData = JSON.parse(responseText);
+          setRecipe(jsonData);
+        } else {
+          setRecipe(responseText);
+        }
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        // If JSON parsing fails, just use the text
+        setRecipe(responseText);
       }
     } catch (err) {
       console.error('Extraction error:', err);

@@ -90,7 +90,7 @@ export default function MobileDebugPage() {
       const cleanUrl = testUrl.trim();
       setTestResult(prev => `${prev}\nCleaned URL: ${cleanUrl}`);
       
-      // Test with the actual recipe extraction endpoint (not debug mode)
+      // Test with the actual recipe extraction endpoint
       const response = await fetch('/api/deepseek/extract-recipe', {
         method: 'POST',
         headers: {
@@ -109,21 +109,18 @@ export default function MobileDebugPage() {
       const contentType = response.headers.get('Content-Type');
       setTestResult(prev => `${prev}\nContent-Type: ${contentType}`);
       
-      try {
-        const responseText = await response.text();
-        setTestResult(prev => `${prev}\nResponse text (first 500 chars): ${responseText.substring(0, 500)}...`);
-        
-        // Try to parse as JSON if it looks like JSON
-        if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
-          try {
-            const jsonData = JSON.parse(responseText);
-            setTestResult(prev => `${prev}\nSuccessfully parsed as JSON`);
-          } catch (e) {
-            setTestResult(prev => `${prev}\nFailed to parse as JSON: ${e}`);
-          }
+      // Always get the response as text
+      const responseText = await response.text();
+      setTestResult(prev => `${prev}\nResponse text (first 500 chars): ${responseText.substring(0, 500)}...`);
+      
+      // Don't try to parse as JSON unless it clearly looks like JSON
+      if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+        try {
+          JSON.parse(responseText);
+          setTestResult(prev => `${prev}\nSuccessfully parsed as JSON`);
+        } catch (e) {
+          setTestResult(prev => `${prev}\nFailed to parse as JSON: ${e}`);
         }
-      } catch (e) {
-        setTestResult(prev => `${prev}\nError reading response: ${e}`);
       }
     } catch (err) {
       setTestResult(`Error: ${err instanceof Error ? err.message : String(err)}`);

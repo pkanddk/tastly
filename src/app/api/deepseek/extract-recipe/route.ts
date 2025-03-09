@@ -62,7 +62,18 @@ export async function POST(request: NextRequest) {
       if (isMobile) {
         try {
           console.log("Using simple extraction for mobile");
-          const simpleRecipe = await extractRecipeSimple(validatedUrl);
+          
+          // Set a timeout for the extraction
+          const extractionPromise = extractRecipeSimple(validatedUrl);
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("Extraction timed out")), 8000); // 8 second timeout
+          });
+          
+          // Race the extraction against the timeout
+          const simpleRecipe = await Promise.race([
+            extractionPromise,
+            timeoutPromise
+          ]) as string;
           
           return new NextResponse(simpleRecipe, {
             headers: { 'Content-Type': 'text/plain' }
@@ -70,9 +81,9 @@ export async function POST(request: NextRequest) {
         } catch (simpleError) {
           console.error("Simple extraction failed:", simpleError);
           
-          // Fall back to the timeout message
+          // Return a very basic fallback that won't cause parsing issues
           return new NextResponse(`
-Recipe from: ${validatedUrl}
+# Recipe from: ${validatedUrl}
 
 We couldn't extract the full recipe details automatically.
 Please visit the original website for the complete recipe.
