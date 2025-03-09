@@ -83,7 +83,12 @@ export default function RecipeExtractor() {
       
       console.log("Request body:", JSON.stringify(requestBody));
       
-      const response = await fetch('/api/deepseek/extract-recipe', {
+      // Use different endpoints for mobile and desktop
+      const endpoint = isMobileDevice 
+        ? '/api/deepseek/extract-recipe-mobile' 
+        : '/api/deepseek/extract-recipe';
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,24 +107,24 @@ export default function RecipeExtractor() {
       const responseText = await response.text();
       console.log("Raw response text:", responseText.substring(0, 100));
       
-      // For mobile devices, always use the text directly
+      // For mobile devices, always use the text directly without any parsing
       if (isMobileDevice) {
+        // Just set the raw text as the recipe
         setRecipe(responseText);
-        return;
-      }
-      
-      // For desktop, try to parse as JSON if it looks like JSON
-      try {
-        if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
-          const jsonData = JSON.parse(responseText);
-          setRecipe(jsonData);
-        } else {
+      } else {
+        // For desktop, try to parse as JSON if it looks like JSON
+        try {
+          if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+            const jsonData = JSON.parse(responseText);
+            setRecipe(jsonData);
+          } else {
+            setRecipe(responseText);
+          }
+        } catch (parseError) {
+          console.error("JSON parse error:", parseError);
+          // If JSON parsing fails, just use the text
           setRecipe(responseText);
         }
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError);
-        // If JSON parsing fails, just use the text
-        setRecipe(responseText);
       }
     } catch (err) {
       console.error('Extraction error:', err);
@@ -380,48 +385,14 @@ export default function RecipeExtractor() {
         isMobile() ? (
           <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
             <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
-            <div className="mb-4">
-              <button 
-                onClick={() => alert(typeof recipe === 'string' ? recipe : JSON.stringify(recipe, null, 2))}
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
-              >
-                Show Raw Data
-              </button>
-            </div>
-            {typeof recipe === 'string' ? (
-              <div className="whitespace-pre-wrap text-gray-200 text-sm">
-                {recipe.split('\n').map((line, i) => (
+            <div className="whitespace-pre-wrap text-gray-200 text-sm">
+              {typeof recipe === 'string' ? 
+                recipe.split('\n').map((line, i) => (
                   <p key={i} className="mb-2">{line}</p>
-                ))}
-              </div>
-            ) : (
-              <div className="text-gray-200 text-sm">
-                <h3 className="text-lg font-semibold mb-2">{recipe.title || 'Recipe'}</h3>
-                {recipe.description && <p className="italic mb-4">{recipe.description}</p>}
-                
-                {recipe.ingredients && recipe.ingredients.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="font-medium mb-1">Ingredients:</h4>
-                    <ul className="list-disc pl-5">
-                      {recipe.ingredients.map((ing, i) => (
-                        <li key={i}>{ing}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                
-                {recipe.instructions && recipe.instructions.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-1">Instructions:</h4>
-                    <ol className="list-decimal pl-5">
-                      {recipe.instructions.map((step, i) => (
-                        <li key={i} className="mb-2">{step}</li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
-              </div>
-            )}
+                )) : 
+                JSON.stringify(recipe, null, 2)
+              }
+            </div>
           </div>
         ) : (
           formatRecipe(recipe)
