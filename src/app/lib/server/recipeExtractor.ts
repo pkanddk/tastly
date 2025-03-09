@@ -2,6 +2,7 @@
 import { load } from 'cheerio';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
+import OpenAI from 'openai';
 
 // Simple in-memory cache
 const recipeCache = new Map<string, { data: any, timestamp: number }>();
@@ -461,4 +462,81 @@ function isLikelyInstruction(text: string): boolean {
     // Contains cooking-related terms
     /(minute|hour|heat|temperature|oven|stove|pan|pot|bowl|whisk|spatula|knife|cutting board|baking sheet|dish)/i.test(text)
   ) && text.length > 20 && text.length < 500; // Instructions are usually longer than ingredients
+}
+
+export async function extractRecipeWithDeepSeekMobile(url: string) {
+  try {
+    console.log("Using optimized DeepSeek extraction for mobile:", url);
+    
+    // Generate a cache key
+    const cacheKey = `mobile-optimized:${url}`;
+    
+    // Check cache first
+    const cachedItem = recipeCache.get(cacheKey);
+    if (cachedItem && (Date.now() - cachedItem.timestamp) < CACHE_TTL) {
+      console.log("Using cached mobile recipe for:", url);
+      return cachedItem.data;
+    }
+    
+    // Initialize DeepSeek client
+    const openai = new OpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY || '',
+      baseURL: 'https://api.deepseek.com',
+    });
+    
+    // Use a very minimal prompt with just the URL
+    const completion = await openai.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        {
+          role: "system",
+          content: "Extract only the ingredients and instructions from recipe URLs. Be extremely concise. Format as markdown with ## Ingredients and ## Instructions sections."
+        },
+        {
+          role: "user",
+          content: `Extract the recipe from this URL: ${url}`
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 800, // Reduced token count for mobile
+      stream: false
+    });
+    
+    const content = completion.choices[0].message.content || '';
+    
+    // Parse the markdown content
+    const titleMatch = content.match(/# (.*)/);
+    const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
+    
+    const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
+    const ingredients = ingredientsMatch 
+      ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+      : [];
+    
+    const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
+    const instructions = instructionsMatch
+      ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i)
+      : [];
+    
+    const result = {
+      title,
+      ingredients,
+      instructions,
+      markdown: content,
+      original: content,
+      method: 'deepseek-mobile',
+      url
+    };
+    
+    // Cache the result
+    recipeCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('Error in mobile DeepSeek extraction:', error);
+    throw error;
+  }
 } 
