@@ -10,6 +10,9 @@ const openai = new OpenAI({
 
 export async function POST(req: NextRequest) {
   try {
+    console.log("extract-recipe API route called with URL:", req.url);
+    console.log("Request headers:", Object.fromEntries([...req.headers.entries()]));
+
     const { url } = await req.json();
     
     if (!url) {
@@ -67,26 +70,40 @@ export async function POST(req: NextRequest) {
     ${bodyContent.substring(0, 15000)} // Limit content to avoid token limits
     `;
     
-    // Use OpenAI with Deepseek API to extract the recipe
-    const completion = await openai.chat.completions.create({
-      model: "deepseek-chat",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that extracts recipes from web pages and formats them in clean markdown. DO NOT wrap your response in markdown code blocks (```). DO NOT use triple backticks or triple quotes at all. Just provide the clean markdown content directly."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0,
-      max_tokens: 4000,
-      stream: false,
-    });
+    // Fix the scope issue with the completion variable
+    let completion;
+    try {
+      console.log("About to call DeepSeek API with prompt length:", prompt.length);
+      completion = await openai.chat.completions.create({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant that extracts recipes from web pages and formats them in clean markdown. DO NOT wrap your response in markdown code blocks (```). DO NOT use triple backticks or triple quotes at all. Just provide the clean markdown content directly."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0,
+        max_tokens: 4000,
+        stream: false,
+      });
+      console.log("DeepSeek API response status:", "Success");
+      console.log("DeepSeek API response length:", completion.choices[0].message.content?.length || 0);
+    } catch (apiError) {
+      console.error("DeepSeek API call failed:", apiError.message);
+      console.error("DeepSeek API error details:", apiError);
+      
+      // Return a properly formatted JSON response for API errors
+      return NextResponse.json({ 
+        error: `DeepSeek API error: ${apiError.message || 'Unknown error'}` 
+      }, { status: 500 });
+    }
     
-    // Return the extracted recipe as JSON
-    const recipeContent = completion.choices[0].message.content || '';
+    // Now completion is accessible here
+    const recipeContent = completion?.choices[0]?.message?.content || '';
 
     // Direct fix for the specific pattern
     const cleanedContent = recipeContent.replace(/^```markdown\s*/i, '').replace(/```$/m, '').replace(/'''/g, '');
