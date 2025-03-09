@@ -3,7 +3,16 @@ import { extractRecipeFromUrl } from '@/app/lib/deepseek';
 
 export async function POST(request: NextRequest) {
   try {
-    const { url } = await request.json();
+    const { url, isMobile } = await request.json();
+    const userAgent = request.headers.get('user-agent') || '';
+    const isMobileHeader = request.headers.get('X-Is-Mobile');
+    
+    console.log("Request info:", { 
+      url, 
+      isMobile, 
+      isMobileHeader,
+      userAgent: userAgent.substring(0, 100) 
+    });
     
     if (!url) {
       return NextResponse.json(

@@ -79,21 +79,36 @@ export default function RecipeExtractor() {
   const formatRecipe = (recipe: any) => {
     if (!recipe) return null;
 
-    console.log("Raw recipe data:", typeof recipe, recipe.substring(0, 100));
+    console.log("Raw recipe data:", typeof recipe, 
+      typeof recipe === 'string' ? recipe.substring(0, 100) : JSON.stringify(recipe).substring(0, 100));
 
     try {
       // Try to parse if it's a string that looks like JSON
       let parsedRecipe;
       if (typeof recipe === 'string') {
+        // First, try to handle any potential BOM or invisible characters
+        const cleanedRecipe = recipe.trim().replace(/^\uFEFF/, '');
+        
         // Check if it starts with { or [ which would indicate JSON
-        if (recipe.trim().startsWith('{') || recipe.trim().startsWith('[')) {
-          parsedRecipe = JSON.parse(recipe);
+        if ((cleanedRecipe.startsWith('{') && cleanedRecipe.endsWith('}')) || 
+            (cleanedRecipe.startsWith('[') && cleanedRecipe.endsWith(']'))) {
+          try {
+            parsedRecipe = JSON.parse(cleanedRecipe);
+          } catch (parseError) {
+            console.error("JSON parse error:", parseError);
+            // Create a simple object with the raw text
+            parsedRecipe = {
+              title: "Extracted Recipe",
+              description: "Recipe extracted from URL",
+              instructions: [cleanedRecipe]
+            };
+          }
         } else {
           // It's markdown or plain text, create a simple object
           parsedRecipe = {
             title: "Extracted Recipe",
             description: "Recipe extracted from URL",
-            instructions: recipe.split('\n').filter(line => line.trim() !== '')
+            instructions: cleanedRecipe.split('\n').filter(line => line.trim() !== '')
           };
         }
       } else {
@@ -245,7 +260,20 @@ export default function RecipeExtractor() {
           <p className="text-gray-300">Extracting recipe...</p>
         </div>
       ) : recipe ? (
-        formatRecipe(recipe)
+        isMobile() ? (
+          <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+            <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
+            {typeof recipe === 'string' ? (
+              <pre className="whitespace-pre-wrap text-gray-200 text-sm">{recipe}</pre>
+            ) : (
+              <pre className="whitespace-pre-wrap text-gray-200 text-sm">
+                {JSON.stringify(recipe, null, 2)}
+              </pre>
+            )}
+          </div>
+        ) : (
+          formatRecipe(recipe)
+        )
       ) : null}
     </div>
   );
