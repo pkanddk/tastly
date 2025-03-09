@@ -27,10 +27,25 @@ const FireIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-// Mobile detection
+// Improved mobile detection
 const isMobile = () => {
   if (typeof window === 'undefined') return false;
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Check for mobile user agent
+  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+  const isMobileUserAgent = mobileRegex.test(navigator.userAgent);
+  
+  // Also check screen width as a fallback
+  const isMobileScreen = window.innerWidth < 768;
+  
+  console.log("Mobile detection:", { 
+    userAgent: navigator.userAgent,
+    isMobileUserAgent,
+    screenWidth: window.innerWidth,
+    isMobileScreen
+  });
+  
+  return isMobileUserAgent || isMobileScreen;
 };
 
 export default function RecipeExtractor() {
@@ -38,6 +53,7 @@ export default function RecipeExtractor() {
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forceMobile, setForceMobile] = useState(false);
 
   useEffect(() => {
     // Reset URL and recipe when component mounts
@@ -95,7 +111,7 @@ export default function RecipeExtractor() {
       }
       
       // Log device info for debugging
-      const isMobileDevice = isMobile();
+      const isMobileDevice = forceMobile || isMobile();
       console.log("Device info:", { isMobile: isMobileDevice, userAgent: navigator.userAgent });
       console.log("Extracting recipe from URL:", cleanUrl);
       
@@ -428,6 +444,15 @@ export default function RecipeExtractor() {
           </div>
         </div>
       ) : null}
+
+      <div className="mt-4 text-center">
+        <button 
+          onClick={() => setForceMobile(!forceMobile)}
+          className="text-sm bg-gray-700 text-white px-3 py-1 rounded"
+        >
+          {forceMobile ? "Switch to Desktop Version" : "Switch to Mobile Version"}
+        </button>
+      </div>
     </div>
   );
 } 
