@@ -255,92 +255,114 @@ export async function extractRecipe(url: string, isMobile: boolean = false) {
     // Use Cheerio to parse the HTML
     const $ = cheerio.load(html);
     
-    // Remove script tags, style tags, and comments to clean up the HTML
-    $('script, style, comment').remove();
+    // Remove navigation, header, footer, and other non-content elements
+    $('nav, header, footer, aside, .nav, .menu, .navigation, .header, .footer, .sidebar, #nav, #menu, #header, #footer, #sidebar').remove();
+    $('[role="navigation"], [role="banner"], [role="contentinfo"]').remove();
+    $('script, style, comment, iframe, .ad, .ads, .advertisement').remove();
     
-    // Get the page title
-    const title = $('h1').first().text().trim() || $('title').text().trim() || 'Recipe';
+    // Get the page title - prefer recipe-specific titles
+    const recipeTitle = $('.recipe-title, .recipe-name, [itemprop="name"], h1').first().text().trim();
+    const pageTitle = $('title').text().trim();
+    const title = recipeTitle || pageTitle || 'Recipe';
     
-    // Extract ingredients
+    // Extract ingredients - focus on recipe-specific elements first
     const ingredients: string[] = [];
     
-    // Look for common ingredient patterns
-    $('ul li').each((i, el) => {
+    // Look for structured recipe data
+    $('[itemprop="recipeIngredient"], .recipe-ingredients li, .ingredients li').each((i, el) => {
       const text = $(el).text().trim();
-      if (text && text.length > 3 && text.length < 200) {
-        ingredients.push(text);
+      if (text && text.length > 3 && text.length < 200 && !ingredients.includes(text)) {
+        // Filter out navigation items and other non-ingredient text
+        if (!isNavigationOrMenuText(text)) {
+          ingredients.push(text);
+        }
       }
     });
     
-    // Also look for ingredients in other common patterns
-    $('.ingredients, .ingredient-list, [itemprop="recipeIngredient"], [class*="ingredient"]').each((i, el) => {
-      const text = $(el).text().trim();
-      if (text && !ingredients.includes(text) && text.length < 200) {
-        ingredients.push(text);
-      }
-    });
+    // If we didn't find ingredients in structured data, look in regular lists
+    if (ingredients.length === 0) {
+      // Find the most likely ingredient list by looking for lists with food-related terms
+      $('ul').each((i, el) => {
+        const listText = $(el).text().trim();
+        // Check if this list contains food-related terms
+        if (/cup|tbsp|tsp|oz|g|kg|ml|l|pound|teaspoon|tablespoon|salt|pepper|sugar|flour|oil|butter|garlic|onion/i.test(listText)) {
+          $(el).find('li').each((j, li) => {
+            const text = $(li).text().trim();
+            if (text && text.length > 3 && text.length < 200 && !ingredients.includes(text)) {
+              // Filter out navigation items and other non-ingredient text
+              if (!isNavigationOrMenuText(text)) {
+                ingredients.push(text);
+              }
+            }
+          });
+        }
+      });
+    }
     
-    // Extract instructions
+    // Extract instructions - focus on recipe-specific elements first
     const instructions: string[] = [];
     
-    // Look for common instruction patterns
-    $('ol li').each((i, el) => {
+    // Look for structured recipe data
+    $('[itemprop="recipeInstructions"], .recipe-instructions li, .instructions li, .directions li, .steps li').each((i, el) => {
       const text = $(el).text().trim();
-      if (text && text.length > 10) {
-        instructions.push(text);
+      if (text && text.length > 10 && text.length < 500 && !instructions.includes(text)) {
+        // Filter out navigation items and other non-instruction text
+        if (!isNavigationOrMenuText(text)) {
+          instructions.push(text);
+        }
       }
     });
     
-    // Also look for instructions in other common patterns
-    $('.instructions, .direction-list, [itemprop="recipeInstructions"], [class*="instruction"], [class*="direction"]').each((i, el) => {
-      const text = $(el).text().trim();
-      if (text && !instructions.includes(text) && text.length > 10) {
-        instructions.push(text);
+    // If we didn't find instructions in structured data, look in regular lists or paragraphs
+    if (instructions.length === 0) {
+      // Find the most likely instruction list by looking for ordered lists or paragraphs with step-like content
+      $('ol').each((i, el) => {
+        $(el).find('li').each((j, li) => {
+          const text = $(li).text().trim();
+          if (text && text.length > 10 && text.length < 500 && !instructions.includes(text)) {
+            // Filter out navigation items and other non-instruction text
+            if (!isNavigationOrMenuText(text) && isLikelyInstruction(text)) {
+              instructions.push(text);
+            }
+          }
+        });
+      });
+      
+      // If still no instructions, look for paragraphs that might be instructions
+      if (instructions.length === 0) {
+        $('.recipe-directions p, .recipe-instructions p, .instructions p, .directions p, .steps p').each((i, el) => {
+          const text = $(el).text().trim();
+          if (text && text.length > 20 && text.length < 500 && !instructions.includes(text)) {
+            if (isLikelyInstruction(text)) {
+              instructions.push(text);
+            }
+          }
+        });
       }
-    });
+    }
     
     // Extract cooking time and servings
     let cookingTime = '';
     let servings = '';
     
-    $('[itemprop="totalTime"], .recipe-time, .cook-time, [class*="time"]').each((i, el) => {
+    $('[itemprop="totalTime"], [itemprop="cookTime"], [itemprop="prepTime"], .recipe-time, .cook-time, .prep-time').each((i, el) => {
       const text = $(el).text().trim();
-      if (text && text.length < 100) cookingTime = text;
+      if (text && text.length < 100 && !isNavigationOrMenuText(text)) cookingTime = text;
     });
     
-    $('[itemprop="recipeYield"], .recipe-yield, .servings, [class*="yield"], [class*="serving"]').each((i, el) => {
+    $('[itemprop="recipeYield"], .recipe-yield, .servings, .yield').each((i, el) => {
       const text = $(el).text().trim();
-      if (text && text.length < 100) servings = text;
+      if (text && text.length < 100 && !isNavigationOrMenuText(text)) servings = text;
     });
     
-    // If we didn't find enough ingredients or instructions, try a more aggressive approach
-    if (ingredients.length < 3 || instructions.length < 2) {
-      console.log("Not enough content found, trying more aggressive extraction");
-      
-      // Look for any list items that might be ingredients
-      $('li').each((i, el) => {
-        const text = $(el).text().trim();
-        if (text && text.length > 3 && text.length < 200 && !ingredients.includes(text)) {
-          // Check if it looks like an ingredient (contains measurements or food items)
-          if (/\d+\s*(cup|tbsp|tsp|oz|g|kg|ml|l|pound|teaspoon|tablespoon)/i.test(text) || 
-              /salt|pepper|sugar|flour|oil|butter|garlic|onion|chicken|beef|pork|fish/i.test(text)) {
-            ingredients.push(text);
-          }
-        }
-      });
-      
-      // Look for paragraphs that might be instructions
-      $('p').each((i, el) => {
-        const text = $(el).text().trim();
-        if (text && text.length > 20 && text.length < 500 && !instructions.includes(text)) {
-          // Check if it looks like an instruction (starts with action verbs or numbers)
-          if (/^(preheat|mix|stir|add|combine|heat|cook|bake|roast|grill|simmer|boil|fry)/i.test(text) ||
-              /^\d+\.?\s+/i.test(text)) {
-            instructions.push(text);
-          }
-        }
-      });
-    }
+    // Clean up the ingredients and instructions
+    const cleanedIngredients = ingredients
+      .map(cleanText)
+      .filter(text => text.length > 0 && isLikelyIngredient(text));
+    
+    const cleanedInstructions = instructions
+      .map(cleanText)
+      .filter(text => text.length > 0 && isLikelyInstruction(text));
     
     // Create a simple markdown recipe
     const simpleRecipe = `
@@ -350,20 +372,20 @@ ${cookingTime ? `## Cooking Time\n${cookingTime}\n\n` : ''}
 ${servings ? `## Servings\n${servings}\n\n` : ''}
 
 ## Ingredients
-${ingredients.length > 0 
-  ? ingredients.map(ing => `- ${ing}`).join('\n')
+${cleanedIngredients.length > 0 
+  ? cleanedIngredients.map(ing => `- ${ing}`).join('\n')
   : '- No ingredients found. Please check the original recipe.'}
 
 ## Instructions
-${instructions.length > 0
-  ? instructions.map((inst, i) => `${i+1}. ${inst}`).join('\n')
+${cleanedInstructions.length > 0
+  ? cleanedInstructions.map((inst, i) => `${i+1}. ${inst}`).join('\n')
   : '- No instructions found. Please check the original recipe.'}
     `.trim();
     
     const result = {
       title,
-      ingredients,
-      instructions,
+      ingredients: cleanedIngredients,
+      instructions: cleanedInstructions,
       cookingTime,
       servings,
       markdown: simpleRecipe,
@@ -384,4 +406,59 @@ ${instructions.length > 0
     console.error('Error in recipe extraction:', error);
     throw error;
   }
+}
+
+// Helper function to clean text
+function cleanText(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/^[^a-zA-Z0-9]+/, '')
+    .trim();
+}
+
+// Helper function to check if text is likely a navigation or menu item
+function isNavigationOrMenuText(text: string): boolean {
+  const navigationTerms = [
+    'home', 'about', 'contact', 'login', 'sign in', 'sign up', 'register',
+    'search', 'menu', 'profile', 'account', 'help', 'faq', 'privacy',
+    'terms', 'copyright', 'subscribe', 'newsletter', 'follow', 'share',
+    'print', 'save', 'email', 'pin', 'tweet', 'facebook', 'instagram',
+    'twitter', 'pinterest', 'youtube', 'snapchat', 'tiktok', 'linkedin',
+    'view all', 'read more', 'see more', 'show more', 'load more',
+    'next', 'previous', 'back', 'forward', 'continue', 'submit',
+    'breakfast', 'lunch', 'dinner', 'dessert', 'appetizer', 'snack',
+    'main dish', 'side dish', 'salad', 'soup', 'bread', 'drink',
+    'chicken', 'beef', 'pork', 'seafood', 'pasta', 'vegetable', 'fruit'
+  ];
+  
+  const lowerText = text.toLowerCase();
+  
+  // Check if the text contains any navigation terms
+  return navigationTerms.some(term => lowerText.includes(term)) &&
+    // And doesn't contain typical ingredient measurements
+    !/\d+\s*(cup|tbsp|tsp|oz|g|kg|ml|l|pound|teaspoon|tablespoon)/i.test(text);
+}
+
+// Helper function to check if text is likely an ingredient
+function isLikelyIngredient(text: string): boolean {
+  // Check for common ingredient patterns
+  return (
+    // Contains measurements
+    /\d+\s*(cup|tbsp|tsp|oz|g|kg|ml|l|pound|teaspoon|tablespoon)/i.test(text) ||
+    // Contains common food items
+    /salt|pepper|sugar|flour|oil|butter|garlic|onion|chicken|beef|pork|fish|egg|milk|cream|cheese|water|broth|stock/i.test(text)
+  ) && text.length < 200; // Ingredients are usually short
+}
+
+// Helper function to check if text is likely an instruction
+function isLikelyInstruction(text: string): boolean {
+  // Check for common instruction patterns
+  return (
+    // Starts with action verbs
+    /^(preheat|mix|stir|add|combine|heat|cook|bake|roast|grill|simmer|boil|fry|sauté|chop|dice|mince|slice|cut|place|put|set|let|allow)/i.test(text) ||
+    // Starts with a number (like a step)
+    /^\d+\.?\s+/i.test(text) ||
+    // Contains cooking-related terms
+    /(minute|hour|heat|temperature|oven|stove|pan|pot|bowl|whisk|spatula|knife|cutting board|baking sheet|dish)/i.test(text)
+  ) && text.length > 20 && text.length < 500; // Instructions are usually longer than ingredients
 } 
