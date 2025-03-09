@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractRecipeWithAI } from '@/app/lib/server/recipeExtractor';
+import { extractRecipeWithAI, extractRecipeSimple } from '@/app/lib/server/recipeExtractor';
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,23 +58,41 @@ export async function POST(request: NextRequest) {
     }
     
     try {
-      // Use the new extraction function with a timeout
+      // For mobile, use the simple extraction to avoid timeouts
+      if (isMobile) {
+        try {
+          console.log("Using simple extraction for mobile");
+          const simpleRecipe = await extractRecipeSimple(validatedUrl);
+          
+          return new NextResponse(simpleRecipe, {
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        } catch (simpleError) {
+          console.error("Simple extraction failed:", simpleError);
+          
+          // Fall back to the timeout message
+          return new NextResponse(`
+Recipe from: ${validatedUrl}
+
+We couldn't extract the full recipe details automatically.
+Please visit the original website for the complete recipe.
+
+Error: ${simpleError instanceof Error ? simpleError.message : 'Unknown error'}
+          `, {
+            headers: { 'Content-Type': 'text/plain' }
+          });
+        }
+      }
+      
+      // For desktop, use the AI extraction with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 50000);
       
       try {
-        const recipeData = await extractRecipeWithAI(validatedUrl, !!isMobile);
+        const recipeData = await extractRecipeWithAI(validatedUrl, false);
         clearTimeout(timeoutId);
         
-        // For mobile, always return as plain text
-        if (isMobile) {
-          return new NextResponse(
-            typeof recipeData === 'string' ? recipeData : JSON.stringify(recipeData, null, 2),
-            { headers: { 'Content-Type': 'text/plain' } }
-          );
-        }
-        
-        // For desktop, return JSON if it's an object, otherwise plain text
+        // Return JSON if it's an object, otherwise plain text
         if (typeof recipeData === 'object') {
           return NextResponse.json(recipeData);
         } else {

@@ -135,4 +135,86 @@ export async function extractRecipeWithAI(url: string, isMobile: boolean = false
     console.error('Error extracting recipe with AI:', error);
     throw error;
   }
+}
+
+// Add this function to your recipeExtractor.ts file
+export async function extractRecipeSimple(url: string) {
+  try {
+    console.log("Using simple extraction for mobile:", url);
+    
+    // Generate a cache key
+    const cacheKey = `simple:${url}`;
+    
+    // Check cache first
+    const cachedItem = recipeCache.get(cacheKey);
+    if (cachedItem && (Date.now() - cachedItem.timestamp) < CACHE_TTL) {
+      console.log("Using cached simple recipe for:", url);
+      return cachedItem.data;
+    }
+    
+    // Fetch the HTML
+    const html = await fetchHtml(url);
+    const $ = load(html);
+    
+    // Extract basic information
+    const title = $('title').text().trim();
+    const pageUrl = url;
+    
+    // Look for common recipe elements
+    let ingredients: string[] = [];
+    let instructions: string[] = [];
+    
+    // Try to find ingredients
+    $('.ingredients, .ingredient-list, .recipe-ingredients, [itemprop="recipeIngredient"]')
+      .find('li, p')
+      .each((_, el) => {
+        const text = $(el).text().trim();
+        if (text && !ingredients.includes(text)) {
+          ingredients.push(text);
+        }
+      });
+    
+    // Try to find instructions
+    $('.instructions, .recipe-instructions, .recipe-steps, [itemprop="recipeInstructions"]')
+      .find('li, p')
+      .each((_, el) => {
+        const text = $(el).text().trim();
+        if (text && !instructions.includes(text)) {
+          instructions.push(text);
+        }
+      });
+    
+    // If we couldn't find structured data, create a simple text summary
+    let result = `# ${title}\n\nFrom: ${pageUrl}\n\n`;
+    
+    if (ingredients.length > 0) {
+      result += "## Ingredients\n\n";
+      ingredients.forEach(ing => {
+        result += `- ${ing}\n`;
+      });
+      result += "\n";
+    }
+    
+    if (instructions.length > 0) {
+      result += "## Instructions\n\n";
+      instructions.forEach((step, i) => {
+        result += `${i+1}. ${step}\n`;
+      });
+    }
+    
+    if (ingredients.length === 0 && instructions.length === 0) {
+      result += "Could not automatically extract recipe details.\nPlease visit the original website for the complete recipe.";
+    }
+    
+    // Cache the result
+    recipeCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now()
+    });
+    
+    return result;
+  } catch (error) {
+    console.error("Simple extraction error:", error);
+    throw error;
+  }
 } 

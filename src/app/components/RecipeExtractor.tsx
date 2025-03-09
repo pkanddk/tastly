@@ -101,36 +101,23 @@ export default function RecipeExtractor() {
       const contentType = response.headers.get('Content-Type');
       console.log("Response content type:", contentType);
       
-      let extractedRecipe;
+      // For mobile devices, always treat the response as text
+      if (isMobileDevice) {
+        const textResponse = await response.text();
+        console.log("Mobile text response:", textResponse.substring(0, 100));
+        setRecipe(textResponse);
+        return;
+      }
       
-      try {
-        if (contentType?.includes('application/json')) {
-          extractedRecipe = await response.json();
-          console.log("Parsed JSON response successfully");
-        } else {
-          extractedRecipe = await response.text();
-          console.log("Parsed text response successfully");
-        }
-        
-        console.log("Extracted recipe type:", typeof extractedRecipe);
-        
-        // Check if the recipe is valid
-        if (!extractedRecipe) {
-          throw new Error("Empty recipe response");
-        }
-        
-        setRecipe(extractedRecipe);
-      } catch (parseError) {
-        console.error("Error parsing response:", parseError);
-        
-        // Try to get the raw response as a fallback
-        try {
-          const rawText = await response.text();
-          console.log("Raw response text:", rawText.substring(0, 200));
-          setRecipe(rawText);
-        } catch (e) {
-          throw new Error(`Failed to parse response: ${parseError.message}`);
-        }
+      // For desktop, try to parse as JSON if appropriate
+      if (contentType?.includes('application/json')) {
+        const jsonResponse = await response.json();
+        console.log("JSON response:", jsonResponse);
+        setRecipe(jsonResponse);
+      } else {
+        const textResponse = await response.text();
+        console.log("Text response:", textResponse.substring(0, 100));
+        setRecipe(textResponse);
       }
     } catch (err) {
       console.error('Extraction error:', err);
