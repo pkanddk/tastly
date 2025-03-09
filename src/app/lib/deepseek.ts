@@ -2,8 +2,12 @@
 
 // This file is now just a client-side wrapper for the API
 export async function extractRecipeFromUrl(url: string) {
+  // Detect environment
+  const isProd = process.env.NODE_ENV === 'production';
+  console.log(`Running in ${isProd ? 'production' : 'development'} environment`);
+
   try {
-    const response = await fetch('/api/extract-recipe', {
+    const response = await fetch('/api/deepseek/extract-recipe', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -11,11 +15,13 @@ export async function extractRecipeFromUrl(url: string) {
       body: JSON.stringify({ url }),
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to extract recipe');
+    const contentType = response.headers.get('Content-Type');
+    
+    if (contentType?.includes('application/json')) {
+      return await response.json();
+    } else {
+      return await response.text();
     }
-
-    return await response.json();
   } catch (error) {
     console.error('Error extracting recipe:', error);
     throw error;

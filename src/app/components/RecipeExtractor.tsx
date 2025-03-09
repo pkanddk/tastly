@@ -42,7 +42,30 @@ export default function RecipeExtractor() {
     try {
       setLoading(true);
       setError(null);
-      const extractedRecipe = await extractRecipeFromUrl(url);
+      
+      // Use a more robust approach to fetch the recipe
+      const response = await fetch('/api/deepseek/extract-recipe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to extract recipe: ${response.status}`);
+      }
+      
+      const contentType = response.headers.get('Content-Type');
+      let extractedRecipe;
+      
+      if (contentType?.includes('application/json')) {
+        extractedRecipe = await response.json();
+      } else {
+        extractedRecipe = await response.text();
+      }
+      
+      console.log("Extracted recipe type:", typeof extractedRecipe);
       setRecipe(extractedRecipe);
     } catch (err) {
       setError('Failed to extract recipe. Please try a different URL.');
@@ -55,9 +78,26 @@ export default function RecipeExtractor() {
   const formatRecipe = (recipe: any) => {
     if (!recipe) return null;
 
+    console.log("Raw recipe data:", typeof recipe, recipe.substring(0, 100));
+
     try {
-      // Try to parse if it's a string
-      let parsedRecipe = typeof recipe === 'string' ? JSON.parse(recipe) : recipe;
+      // Try to parse if it's a string that looks like JSON
+      let parsedRecipe;
+      if (typeof recipe === 'string') {
+        // Check if it starts with { or [ which would indicate JSON
+        if (recipe.trim().startsWith('{') || recipe.trim().startsWith('[')) {
+          parsedRecipe = JSON.parse(recipe);
+        } else {
+          // It's markdown or plain text, create a simple object
+          parsedRecipe = {
+            title: "Extracted Recipe",
+            description: "Recipe extracted from URL",
+            instructions: recipe.split('\n').filter(line => line.trim() !== '')
+          };
+        }
+      } else {
+        parsedRecipe = recipe;
+      }
       
       // Add this simple message at the beginning
       return (
@@ -174,9 +214,11 @@ export default function RecipeExtractor() {
         </div>
       );
     } catch (error) {
-      // If parsing fails, display as formatted text
+      console.error("Error formatting recipe:", error);
+      // Fallback to displaying as text
       return (
         <div className="bg-gray-900 rounded-xl p-6 shadow-lg">
+          <h2 className="text-xl font-bold text-white mb-4">Extracted Recipe</h2>
           <pre className="whitespace-pre-wrap text-gray-200">{recipe}</pre>
         </div>
       );

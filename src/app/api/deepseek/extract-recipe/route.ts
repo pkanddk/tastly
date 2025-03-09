@@ -12,9 +12,20 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    console.log("Extracting recipe from URL:", url);
     const recipeMarkdown = await extractRecipeFromUrl(url);
+    console.log("Recipe extraction result type:", typeof recipeMarkdown);
+    console.log("Recipe extraction result preview:", 
+      typeof recipeMarkdown === 'string' 
+        ? recipeMarkdown.substring(0, 100) 
+        : JSON.stringify(recipeMarkdown).substring(0, 100));
     
-    // Return the markdown content directly as text
+    // If returning JSON
+    if (typeof recipeMarkdown === 'object') {
+      return NextResponse.json(recipeMarkdown);
+    }
+
+    // If returning plain text
     return new NextResponse(recipeMarkdown, {
       headers: {
         'Content-Type': 'text/plain'

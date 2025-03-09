@@ -54,24 +54,32 @@ export const signOut = async (callback?: () => void) => {
 export const signInWithGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
-    // Add this line to prefer popup mode
-    provider.setCustomParameters({ prompt: 'select_account' });
     
-    // Use signInWithPopup with error handling
-    const result = await signInWithPopup(auth, provider)
-      .catch((error) => {
-        console.error("Popup sign-in error:", error);
-        // Fallback to redirect method if popup fails
-        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-          console.log("Popup was blocked or closed, trying redirect method");
-          return signInWithRedirect(auth, provider);
-        }
-        throw error;
-      });
+    // First try with popup
+    try {
+      const result = await signInWithPopup(auth, provider);
+      return result.user;
+    } catch (popupError: any) {
+      console.error("Popup sign-in error:", popupError);
       
-    return result;
+      // Check for specific popup errors that warrant a redirect fallback
+      if (
+        popupError.code === 'auth/cancelled-popup-request' ||
+        popupError.code === 'auth/popup-blocked' ||
+        popupError.code === 'auth/popup-closed-by-user'
+      ) {
+        console.log("Falling back to redirect method...");
+        // Use redirect as fallback
+        await signInWithRedirect(auth, provider);
+        // Note: This will redirect the page, so no code after this will execute
+        // until the user returns to the app
+      } else {
+        // For other errors, rethrow
+        throw popupError;
+      }
+    }
   } catch (error) {
-    console.error("Error signing in with Google:", error);
+    console.error("Google sign-in error:", error);
     throw error;
   }
 };
