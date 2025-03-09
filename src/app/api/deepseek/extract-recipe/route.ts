@@ -22,12 +22,24 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Validate the URL
+    let validatedUrl;
+    try {
+      validatedUrl = new URL(url).toString();
+      console.log("Validated URL:", validatedUrl);
+    } catch (e) {
+      return NextResponse.json(
+        { error: 'Invalid URL format' },
+        { status: 400 }
+      );
+    }
+    
     // If debug mode is enabled, return detailed information
     if (debug) {
       return NextResponse.json({
         message: "Debug mode enabled",
         requestInfo: {
-          url,
+          url: validatedUrl,
           isMobile,
           userAgent: userAgent.substring(0, 100),
           headers: Object.fromEntries(request.headers.entries()),
@@ -35,8 +47,8 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    console.log("Extracting recipe from URL:", url);
-    const recipeMarkdown = await extractRecipeFromUrl(url);
+    console.log("Extracting recipe from URL:", validatedUrl);
+    const recipeMarkdown = await extractRecipeFromUrl(validatedUrl);
     console.log("Recipe extraction result type:", typeof recipeMarkdown);
     console.log("Recipe extraction result preview:", 
       typeof recipeMarkdown === 'string' 

@@ -7,12 +7,24 @@ interface RecipeUrlInputProps {
   setUrl: (url: string) => void;
   onExtract: () => void;
   loading: boolean;
+  error: string | null;
+  setError: (error: string | null) => void;
 }
 
-export default function RecipeUrlInput({ url, setUrl, onExtract, loading }: RecipeUrlInputProps) {
+export default function RecipeUrlInput({ url, setUrl, onExtract, loading, error, setError }: RecipeUrlInputProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onExtract();
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newUrl = e.target.value;
+    setUrl(newUrl);
+    
+    // Clear any previous error when the user types
+    if (error) {
+      setError(null);
+    }
   };
 
   return (
@@ -21,7 +33,7 @@ export default function RecipeUrlInput({ url, setUrl, onExtract, loading }: Reci
         <input
           type="url"
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={handleUrlChange}
           placeholder="Paste recipe URL here"
           className="flex-grow px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           required

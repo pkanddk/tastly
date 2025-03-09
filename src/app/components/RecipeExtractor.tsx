@@ -39,6 +39,17 @@ export default function RecipeExtractor() {
       return;
     }
 
+    // Clean and validate the URL
+    let cleanUrl = url.trim();
+    
+    // Check if it's a valid URL
+    try {
+      new URL(cleanUrl); // This will throw if the URL is invalid
+    } catch (e) {
+      setError('Please enter a valid URL');
+      return;
+    }
+    
     try {
       setLoading(true);
       setError(null);
@@ -46,18 +57,18 @@ export default function RecipeExtractor() {
       // Log device info for debugging
       const isMobileDevice = isMobile();
       console.log("Device info:", { isMobile: isMobileDevice, userAgent: navigator.userAgent });
+      console.log("Extracting recipe from URL:", cleanUrl);
       
       const response = await fetch('/api/deepseek/extract-recipe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Add mobile flag to help with debugging
           'X-Is-Mobile': isMobileDevice ? 'true' : 'false'
         },
         body: JSON.stringify({ 
-          url, 
+          url: cleanUrl, 
           isMobile: isMobileDevice,
-          timestamp: new Date().toISOString() // Add timestamp to prevent caching
+          timestamp: new Date().toISOString()
         }),
       });
       
@@ -251,13 +262,22 @@ export default function RecipeExtractor() {
     }
   };
 
+  const clearError = () => {
+    if (error) {
+      setError(null);
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-center mb-6">Recipe Extractor</h1>
         <RecipeUrlInput 
           url={url} 
-          setUrl={setUrl} 
+          setUrl={(newUrl) => {
+            setUrl(newUrl);
+            clearError();
+          }} 
           onExtract={handleExtract} 
           loading={loading}
         />
