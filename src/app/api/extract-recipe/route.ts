@@ -29,9 +29,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
     
-    // Set a reasonable timeout for the fetch operation (10 seconds)
+    // Add a shorter timeout for the fetch operation on mobile
+    const fetchTimeout = isMobile ? 8000 : 10000; // 8 seconds for mobile, 10 for desktop
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), fetchTimeout);
+    
+    // Reduce the prompt size for mobile
+    const contentLimit = isMobile ? 10000 : 15000;
+    const bodyContentTrimmed = bodyContent.substring(0, contentLimit);
+    
+    // Reduce max_tokens for mobile to speed up processing
+    const maxTokens = isMobile ? 2000 : 4000;
     
     // Fetch the page content with timeout protection
     const response = await fetch(url, { 
@@ -77,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     Here's the content from the page with title "${title}":
 
-    ${bodyContent.substring(0, 15000)} // Limit content to avoid token limits
+    ${bodyContentTrimmed} // Limit content to avoid token limits
     `;
     
     // Fix the scope issue with the completion variable
@@ -97,16 +105,67 @@ export async function POST(req: NextRequest) {
           }
         ],
         temperature: 0,
-        max_tokens: 4000,
+        max_tokens: maxTokens,
         stream: false,
       });
       console.log("DeepSeek API response status:", "Success");
       console.log("DeepSeek API response length:", completion.choices[0].message.content?.length || 0);
     } catch (apiError) {
       console.error("DeepSeek API call failed:", apiError.message);
-      console.error("DeepSeek API error details:", apiError);
       
-      // Return a properly formatted JSON response for API errors
+      // Try a simpler extraction method
+      try {
+        console.log("Attempting simpler extraction method");
+        
+        // Simple extraction logic
+        const title = $('h1').first().text() || $('title').text() || 'Recipe';
+        const ingredients = [];
+        const instructions = [];
+        
+        // Look for common ingredient patterns
+        $('ul li').each((i, el) => {
+          const text = $(el).text().trim();
+          if (text && text.length > 3 && text.length < 200) {
+            ingredients.push(text);
+          }
+        });
+        
+        // Look for common instruction patterns
+        $('ol li').each((i, el) => {
+          const text = $(el).text().trim();
+          if (text && text.length > 10) {
+            instructions.push(text);
+          }
+        });
+        
+        // Create a simple markdown recipe
+        const simpleRecipe = `
+# ${title}
+
+## Ingredients
+${ingredients.map(ing => `- ${ing}`).join('\n')}
+
+## Instructions
+${instructions.map((inst, i) => `${i+1}. ${inst}`).join('\n')}
+        `.trim();
+        
+        return NextResponse.json({ 
+          markdown: simpleRecipe,
+          original: simpleRecipe,
+          method: 'simple'
+        }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          }
+        });
+      } catch (fallbackError) {
+        console.error("Fallback extraction failed:", fallbackError);
+        // Continue to the original error response
+      }
+      
+      // Original error response
       return NextResponse.json({ 
         error: `DeepSeek API error: ${apiError.message || 'Unknown error'}` 
       }, { status: 500 });

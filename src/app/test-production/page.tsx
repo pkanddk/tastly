@@ -2,59 +2,114 @@
 
 import { useState } from 'react';
 
-export default function TestProductionPage() {
-  const [result, setResult] = useState<string | null>(null);
+export default function TestProduction() {
+  const [url, setUrl] = useState('https://www.allrecipes.com/recipe/273671/orange-maple-roasted-carrots-and-fennel/');
+  const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-
-  const testProductionEndpoint = async () => {
+  const [error, setError] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [endTime, setEndTime] = useState<number | null>(null);
+  
+  const runTest = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/test-production-deepseek', {
+      setError(null);
+      setResult(null);
+      setStartTime(Date.now());
+      setEndTime(null);
+      
+      // Log device info
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      console.log("Device info:", { isMobile, userAgent: navigator.userAgent });
+      
+      // Call the API directly
+      const response = await fetch('/api/extract-recipe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Is-Mobile': isMobile ? 'true' : 'false',
+          'X-Test-Production': 'true'
         },
-        body: JSON.stringify({ url: 'https://example.com' }),
+        body: JSON.stringify({ url })
       });
       
-      const contentType = response.headers.get('Content-Type');
-      let testData;
+      setEndTime(Date.now());
+      console.log("Response status:", response.status);
       
-      if (contentType?.includes('application/json')) {
-        testData = await response.json();
-        setResult(JSON.stringify(testData, null, 2));
-      } else {
-        testData = await response.text();
-        setResult(testData);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API error (${response.status}): ${errorText}`);
       }
       
-      console.log("Test production response:", typeof testData, testData);
+      // Display the raw response for debugging
+      const rawResponse = await response.text();
+      console.log("Raw response:", rawResponse);
+      
+      try {
+        const data = JSON.parse(rawResponse);
+        setResult(data);
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        setError(`Failed to parse JSON: ${rawResponse.substring(0, 100)}...`);
+      }
+      
     } catch (err) {
-      console.error(err);
-      setResult(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      console.error("Test error:", err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
   };
-
+  
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Test Production Endpoint</h1>
+    <div className="p-4 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Recipe Extraction Test</h1>
+      
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">Recipe URL:</label>
+        <input 
+          type="text" 
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          className="w-full p-2 border rounded"
+        />
+      </div>
       
       <button 
-        onClick={testProductionEndpoint}
-        className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded-lg mb-6"
+        onClick={runTest}
+        className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
         disabled={loading}
       >
-        {loading ? 'Testing...' : 'Test Production Endpoint'}
+        {loading ? 'Testing...' : 'Run Test'}
       </button>
       
+      {startTime && endTime && (
+        <div className="text-sm mb-4">
+          Time taken: {((endTime - startTime) / 1000).toFixed(2)} seconds
+        </div>
+      )}
+      
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+        </div>
+      )}
+      
       {result && (
-        <div className="bg-gray-900 rounded-xl p-6 shadow-lg">
-          <h2 className="text-xl font-bold text-white mb-4">Result:</h2>
-          <pre className="whitespace-pre-wrap text-gray-200 overflow-auto max-h-96">
-            {result}
-          </pre>
+        <div className="mt-4">
+          <h2 className="text-xl font-semibold mb-2">Result:</h2>
+          <div className="bg-gray-100 p-4 rounded mb-4">
+            <h3 className="font-medium mb-2">Markdown Content:</h3>
+            <div className="whitespace-pre-wrap bg-white p-3 border rounded text-sm">
+              {result.markdown}
+            </div>
+          </div>
+          <div className="bg-gray-100 p-4 rounded">
+            <h3 className="font-medium mb-2">Full Response:</h3>
+            <pre className="overflow-auto max-h-96 bg-white p-3 border rounded text-xs">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </div>
         </div>
       )}
     </div>
