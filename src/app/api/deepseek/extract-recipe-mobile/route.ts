@@ -38,8 +38,17 @@ export async function POST(request: NextRequest) {
       
     } catch (error) {
       console.error("Mobile extraction error:", error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        return NextResponse.json(
+          {
+            error: 'Mobile extraction timed out',
+            markdown: `# Recipe from: ${validatedUrl}\n\nWe're having trouble with mobile extraction.\nPlease try the desktop version or visit the original site.`
+          },
+          { status: 408 }
+        );
+      }
       return NextResponse.json(
-        { 
+        {
           error: error instanceof Error ? error.message : 'Mobile extraction failed',
           markdown: `# Recipe from: ${validatedUrl}\n\nWe're having trouble with mobile extraction.\nPlease try the desktop version or visit the original site.`
         },

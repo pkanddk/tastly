@@ -60,85 +60,73 @@ export default function RecipeExtractorClient() {
       // Add a timeout to prevent hanging indefinitely
       const extractionPromise = new Promise(async (resolve, reject) => {
         try {
-          // Check cache first
-          const cachedRecipe = await getRecipeFromCache(url);
+          // Fetch fresh recipe
+          const response = await fetch(isMobileDevice() ? '/api/deepseek/extract-recipe-mobile' : '/api/extract-recipe', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to extract recipe');
+          }
+
+          // Check if the response is a stream or JSON
+          const contentType = response.headers.get('content-type');
           
-          if (cachedRecipe) {
-            // Use cached recipe
-            setRecipe(cachedRecipe);
+          if (contentType && contentType.includes('text/event-stream')) {
+            // Handle streaming response
+            const reader = response.body?.getReader();
+            if (!reader) {
+              throw new Error('Failed to get reader from response');
+            }
             
-            // Still try to get the image in the background
+            let extractedRecipe = '';
+            
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              // Convert the chunk to text and append to the recipe
+              const chunk = new TextDecoder().decode(value);
+              extractedRecipe += chunk;
+            }
+            
+            // Cache the recipe for future use
+            cacheRecipeUrl(url, extractedRecipe);
+            
+            setRecipe(extractedRecipe);
             fetchImage(url);
-            resolve(cachedRecipe);
+            resolve(extractedRecipe);
           } else {
-            // Fetch fresh recipe
-            const response = await fetch(isMobileDevice() ? '/api/deepseek/extract-recipe-mobile' : '/api/extract-recipe', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ url }),
-            });
-
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'Failed to extract recipe');
-            }
-
-            // Check if the response is a stream or JSON
-            const contentType = response.headers.get('content-type');
+            // Handle JSON response
+            const data = await response.json();
             
-            if (contentType && contentType.includes('text/event-stream')) {
-              // Handle streaming response
-              const reader = response.body?.getReader();
-              if (!reader) {
-                throw new Error('Failed to get reader from response');
+            // Extract the markdown content from the response
+            let extractedRecipe = data.markdown || data.content || data;
+            
+            // If we still have markdown tags, try processing the original
+            if (typeof extractedRecipe === 'string' && 
+                (extractedRecipe.includes('```') || extractedRecipe.includes("'''"))) {
+              if (data.original) {
+                extractedRecipe = processRecipeResponse(data.original);
               }
-              
-              let extractedRecipe = '';
-              
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                // Convert the chunk to text and append to the recipe
-                const chunk = new TextDecoder().decode(value);
-                extractedRecipe += chunk;
-              }
-              
-              // Cache the recipe for future use
-              cacheRecipeUrl(url, extractedRecipe);
-              
-              setRecipe(extractedRecipe);
-              fetchImage(url);
-              resolve(extractedRecipe);
-            } else {
-              // Handle JSON response
-              const data = await response.json();
-              
-              // Extract the markdown content from the response
-              let extractedRecipe = data.markdown || data.content || data;
-              
-              // If we still have markdown tags, try processing the original
-              if (typeof extractedRecipe === 'string' && 
-                  (extractedRecipe.includes('```') || extractedRecipe.includes("'''"))) {
-                if (data.original) {
-                  extractedRecipe = processRecipeResponse(data.original);
-                }
-              }
-              
-              // Cache the recipe for future use
-              cacheRecipeUrl(url, extractedRecipe);
-              
-              // Process the recipe data
-              if (typeof extractedRecipe === 'string') {
-                extractedRecipe = processRecipeResponse(extractedRecipe);
-              }
-              
-              setRecipe(extractedRecipe);
-              fetchImage(url);
-              resolve(extractedRecipe);
             }
+            
+            // Cache the recipe for future use
+            cacheRecipeUrl(url, extractedRecipe);
+            
+            // Process the recipe data
+            if (typeof extractedRecipe === 'string') {
+              extractedRecipe = processRecipeResponse(extractedRecipe);
+            }
+            
+            setRecipe(extractedRecipe);
+            fetchImage(url);
+            resolve(extractedRecipe);
           }
         } catch (error) {
           reject(error);

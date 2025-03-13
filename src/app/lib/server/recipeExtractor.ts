@@ -503,11 +503,11 @@ export async function extractRecipeWithDeepSeekMobile(url: string) {
         },
         {
           role: "user",
-          content: `Extract the recipe from this URL: ${url}`
+          content: `Extract recipe: ${url}`
         }
       ],
       temperature: 0.1,
-      max_tokens: 800, // Reduced token count for mobile
+      max_tokens: 500, // Reduced token count for mobile
       stream: false
     });
     
