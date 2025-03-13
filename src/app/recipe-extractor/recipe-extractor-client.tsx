@@ -61,7 +61,11 @@ export default function RecipeExtractorClient() {
       const extractionPromise = new Promise(async (resolve, reject) => {
         try {
           // Fetch fresh recipe
-          const response = await fetch(isMobileDevice() ? '/api/deepseek/extract-recipe-mobile' : '/api/extract-recipe', {
+          const endpoint = isMobileDevice()
+            ? '/api/extract-recipe-anthropic'  // Use Anthropic for mobile
+            : '/api/extract-recipe';          // Use DeepSeek for desktop
+
+          const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
