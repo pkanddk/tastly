@@ -90,10 +90,7 @@ export async function POST(request: NextRequest) {
     
     // Make sure the image URL is absolute
     if (imageUrl && !imageUrl.startsWith('http')) {
-      const urlObj = new URL(url);
-      imageUrl = imageUrl.startsWith('/') 
-        ? `${urlObj.protocol}//${urlObj.host}${imageUrl}`
-        : `${urlObj.protocol}//${urlObj.host}/${imageUrl}`;
+      imageUrl = new URL(imageUrl, url).toString();
     }
     
     return NextResponse.json({ imageUrl });

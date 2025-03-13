@@ -103,7 +103,8 @@ export default function RecipeExtractorClient() {
             cacheRecipeUrl(url, extractedRecipe);
             
             setRecipe(extractedRecipe);
-            fetchImage(url);
+            // TEMPORARILY DISABLE IMAGE EXTRACTION
+            // fetchImage(url);
             resolve(extractedRecipe);
           } else {
             // Handle JSON response
@@ -129,7 +130,8 @@ export default function RecipeExtractorClient() {
             }
             
             setRecipe(extractedRecipe);
-            fetchImage(url);
+            // TEMPORARILY DISABLE IMAGE EXTRACTION
+            // fetchImage(url);
             resolve(extractedRecipe);
           }
         } catch (error) {

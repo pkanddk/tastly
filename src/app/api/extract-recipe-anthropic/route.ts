@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { anthropic } from '@ai-sdk/anthropic';
-import { experimental_StreamData, streamText } from 'ai';
 
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
+  console.log("1. extract-recipe-anthropic called"); // LOG
   try {
     const { url } = await req.json();
 
@@ -13,10 +13,11 @@ export async function POST(req: NextRequest) {
     }
 
     const validatedUrl = new URL(url).toString(); // Validate URL
+    console.log("2. URL validated:", validatedUrl); // LOG
 
-    const prompt = `Extract the recipe from this URL: ${validatedUrl}. Return ONLY the title, ingredients (as a list), and instructions (as steps). Be extremely concise.`;
+    // Extremely concise prompt
+    const prompt = `Extract recipe from ${validatedUrl}: Title, ingredients (list), instructions (numbered).`;
 
-    // Get the Anthropic API key from environment variables
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
@@ -26,18 +27,37 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    const result = await streamText({
-        // Use the apiKey directly with the model
-        model: anthropic("claude-3-5-sonnet-20240620", {apiKey: apiKey}),
-        messages: [
-            { role: 'system', content: 'You are a recipe extraction assistant. Focus on ingredients and instructions. Ignore all website navigation, ads, and comments.' },
-            { role: 'user', content: prompt },
-        ],
-        max_tokens: 500, // Keep it short
-    });
 
-    const data = new experimental_StreamData();
-    return result.toDataStreamResponse(data);
+    console.log("3. Making Anthropic API call"); // LOG
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+            "x-api-key": apiKey,
+        },
+        body: JSON.stringify({
+            model: "claude-3-5-sonnet-20240620", // Or another Claude 3 model
+            messages: [
+              { role: 'system', content: 'Extract recipe: title, ingredients (list), instructions (numbered). Ignore everything else.' },
+              { role: 'user', content: prompt },
+            ],
+            max_tokens: 300, // Very short
+            stream: false
+        })
+    });
+    console.log("4. Anthropic API call completed"); // LOG
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Anthropic API error:", response.status, errorText);
+        return NextResponse.json({error: `Anthropic API Error: ${response.status}`}, {status: 500});
+    }
+    const data = await response.json();
+    console.log("5. Parsed Anthropic response:", data); // LOG
+    const recipeText = data.content[0].text;
+
+    return NextResponse.json({markdown: recipeText});
 
   } catch (error) {
     console.error('Anthropic recipe extraction error:', error);
