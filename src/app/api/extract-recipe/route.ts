@@ -17,8 +17,18 @@ export async function POST(req: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
     
     try {
-      // Use the simplified extraction
-      const recipeContent = await extractRecipeSimple(url); // Always use simple
+      // Use the optimized extraction with timeout - ALWAYS use desktop mode
+      console.log("Using optimized extraction with timeout");
+      const extractPromise = extractRecipeWithDeepSeekOptimized(url, false); // Always false for desktop mode
+
+      // Race the extraction against the timeout
+      const recipe = await Promise.race([
+        extractPromise,
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Extraction timed out')), 25000);
+        })
+      ]);
+
       clearTimeout(timeoutId);
       
       // Check if the request is using HTTPS
@@ -30,7 +40,7 @@ export async function POST(req: NextRequest) {
         );
       }
       
-      return NextResponse.json(recipeContent, {
+      return NextResponse.json(recipe, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
