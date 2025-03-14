@@ -573,23 +573,31 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       apiKey: process.env.OPENAI_API_KEY || '',
     });
     
-    // Make the API call with the timeout
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Use GPT-4o mini instead
-      messages: [
-        {
-          role: "system",
-          content: "You extract recipes from URLs into a clean, formatted markdown."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.1,
-      max_tokens: 1000,
-      stream: false
-    });
+    // In the system prompt, emphasize title extraction:
+    const systemPrompt = `You extract recipes from URLs into clean, formatted markdown.
+IMPORTANT: Always extract the EXACT recipe title from the page, not from the URL.
+Format as:
+# [Exact Recipe Title]
+## Ingredients
+- ingredient 1
+## Instructions
+1. step 1`;
+
+    // Then in the messages array:
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    temperature: 0.1,
+    max_tokens: 1000,
+    stream: false
+  });
     
     clearTimeout(timeoutId);
     
