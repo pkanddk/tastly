@@ -552,7 +552,7 @@ export async function extractRecipeWithDeepSeekMobile(url: string) {
 
 export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: boolean = false) {
   try {
-    // Set a shorter timeout for the DeepSeek API call
+    // Set a timeout for the API call
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
     
@@ -566,15 +566,14 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
 1. step 1
 2. step 2`;
 
-    // Initialize OpenAI client with the DeepSeek API
+    // Initialize OpenAI client with the OpenAI API
     const openai = new OpenAI({
-      apiKey: process.env.DEEPSEEK_API_KEY || '',
-      baseURL: 'https://api.deepseek.com/v1',
+      apiKey: process.env.OPENAI_API_KEY || '',
     });
     
     // Make the API call with the timeout
     const completion = await openai.chat.completions.create({
-      model: "deepseek-chat",
+      model: "gpt-4o-mini", // Use GPT-4o mini instead
       messages: [
         {
           role: "system",
@@ -614,11 +613,11 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
       instructions,
       markdown: content,
       original: content,
-      method: 'deepseek-optimized',
+      method: 'openai-gpt4o-mini',
       url
     };
   } catch (error) {
-    console.error('Error in DeepSeek extraction:', error);
+    console.error('Error in OpenAI extraction:', error);
     
     // Return a basic fallback result
     return {

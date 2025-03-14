@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { anthropic } from '@ai-sdk/anthropic';
+import OpenAI from 'openai';
 
 export const runtime = 'edge';
 
@@ -11,11 +11,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
     
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'Anthropic API key is not configured' },
+        { error: 'OpenAI API key is not configured' },
         { status: 500 }
       );
     }
@@ -35,35 +35,32 @@ export async function POST(req: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     
     try {
-      // Use the AI SDK to call Anthropic
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-sonnet-20240229',
-          max_tokens: 1000,
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ]
-        }),
-        signal: controller.signal
+      // Initialize OpenAI client
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY || '',
+      });
+      
+      // Make the API call with the timeout
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You extract recipes from URLs into a clean, formatted markdown."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 1000,
+        stream: false
       });
       
       clearTimeout(timeoutId);
       
-      if (!response.ok) {
-        throw new Error(`Anthropic API error: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      const content = data.content[0].text;
+      const content = completion.choices[0].message.content || '';
       
       // Parse the markdown content
       const titleMatch = content.match(/# (.*)/);
@@ -85,7 +82,7 @@ export async function POST(req: NextRequest) {
         instructions,
         markdown: content,
         original: content,
-        method: 'anthropic-mobile',
+        method: 'openai-gpt4o-mini-mobile',
         url
       });
     } catch (error) {
@@ -93,7 +90,7 @@ export async function POST(req: NextRequest) {
       throw error;
     }
   } catch (error) {
-    console.error('Anthropic recipe extraction error:', error);
+    console.error('OpenAI recipe extraction error:', error);
     
     return NextResponse.json({
       title: "Recipe Extraction Failed",
