@@ -481,7 +481,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
   );
 }
 
-// Update the formatMarkdown function to remove border lines from non-ingredient sections
+// Update the formatMarkdown function to add a line under the last ingredient
 
 function formatMarkdown(text: string) {
   // First, skip common metadata lines that we're already displaying at the top
@@ -538,7 +538,7 @@ function formatMarkdown(text: string) {
       // Check if this is the Ingredients section to apply borders
       const isIngredientsSection = title.toLowerCase().includes('ingredient');
       
-      listItems.forEach(item => {
+      listItems.forEach((item, idx) => {
         const trimmedItem = item.trim();
         
         // Check if this is a subheading (ends with colon)
@@ -557,8 +557,8 @@ function formatMarkdown(text: string) {
             });
             html += `</ul>`;
           } else {
-            // Only apply borders to ingredients section items
-            const borderClass = isIngredientsSection ? "border-b border-gray-700 last:border-0" : "";
+            // Apply borders to all items in ingredients section, including the last one
+            const borderClass = isIngredientsSection ? "border-b border-gray-700" : "";
             html += `<li class="py-1 ${borderClass} mb-1">${trimmedItem}</li>`;
           }
         }
