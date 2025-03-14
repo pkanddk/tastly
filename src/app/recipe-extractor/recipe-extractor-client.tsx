@@ -202,35 +202,46 @@ export default function RecipeExtractorClient() {
     }
   };
 
+  // First, wrap the input and button in a form element
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleExtract();
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6 text-center">Recipe Extractor</h1>
       
-      {/* Use a different layout for mobile */}
-      <div className={`${isMobile ? 'flex flex-col gap-4' : 'flex mb-4'}`}>
-        <input
-          type="url"
-          className={`${isMobile ? 'w-full' : 'flex-grow'} p-3 border rounded-xl bg-gray-800 text-white placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-          placeholder="Enter recipe URL"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-        <button
-          className={`${isMobile ? 'w-full' : ''} bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-colors`}
-          onClick={handleExtract}
-          disabled={loading}
-        >
-          {loading ? 'Extracting...' : 'Extract Recipe'}
-        </button>
-      </div>
+      <form onSubmit={handleSubmit} className="w-full max-w-lg mx-auto">
+        {/* Mobile layout with stacked controls */}
+        <div className="flex flex-col gap-4">
+          <input
+            type="url"
+            className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Enter recipe URL"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            required
+          />
+          <button
+            type="submit"
+            className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors"
+            disabled={loading}
+          >
+            {loading ? 'Extracting...' : 'Extract Recipe'}
+          </button>
+        </div>
+      </form>
       
-      {error && <div className="text-red-500 mb-4">{error}</div>}
+      {error && <div className="text-red-500 mb-4 mt-4 text-center">{error}</div>}
       {recipe && (
-        <RecipeDisplay 
-          recipe={recipe.markdown || recipe} 
-          recipeImage={recipeImage || DEFAULT_RECIPE_IMAGE}
-          url={url}
-        />
+        <div className="mt-8">
+          <RecipeDisplay 
+            recipe={recipe.markdown || recipe} 
+            recipeImage={recipeImage || DEFAULT_RECIPE_IMAGE}
+            url={url}
+          />
+        </div>
       )}
     </div>
   );
