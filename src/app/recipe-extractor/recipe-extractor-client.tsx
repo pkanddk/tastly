@@ -84,9 +84,17 @@ export default function RecipeExtractorClient() {
             body: JSON.stringify({ url }),
           });
 
+          // Better error handling for non-JSON responses
           if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to extract recipe');
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `Failed to extract recipe: ${response.status}`);
+            } else {
+              const errorText = await response.text();
+              console.error('Non-JSON error response:', errorText);
+              throw new Error(`Failed to extract recipe: ${response.status}`);
+            }
           }
 
           // Check if the response is a stream or JSON
@@ -158,9 +166,17 @@ export default function RecipeExtractorClient() {
       // Race the extraction against the timeout
       await Promise.race([extractionPromise, timeoutPromise]);
       
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Extraction error:', err);
       setError(`Failed to extract recipe: ${err instanceof Error ? err.message : 'Please try a different URL'}`);
+      
+      // Show a more user-friendly error message
+      setRecipe({
+        title: "Recipe Extraction Failed",
+        ingredients: ["Could not extract ingredients"],
+        instructions: ["Please try again later or manually copy the recipe"],
+        markdown: "# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later or manually copy the recipe from the original website.",
+      });
     } finally {
       setLoading(false);
     }
