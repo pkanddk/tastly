@@ -122,8 +122,7 @@ export default function RecipeExtractorClient() {
             cacheRecipeUrl(url, extractedRecipe);
             
             setRecipe(extractedRecipe);
-            // TEMPORARILY DISABLE IMAGE EXTRACTION
-            // fetchImage(url);
+            fetchImage(url);
             resolve(extractedRecipe);
           } else {
             // Handle JSON response
@@ -149,8 +148,7 @@ export default function RecipeExtractorClient() {
             }
             
             setRecipe(extractedRecipe);
-            // TEMPORARILY DISABLE IMAGE EXTRACTION
-            // fetchImage(url);
+            fetchImage(url);
             resolve(extractedRecipe);
           }
         } catch (error) {
@@ -203,7 +201,7 @@ export default function RecipeExtractorClient() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Recipe Extractor</h1>
+      <h1 className="text-2xl font-bold mb-4 text-center">Recipe Extractor</h1>
       <div className="flex mb-4">
         <input
           type="url"
@@ -219,14 +217,6 @@ export default function RecipeExtractorClient() {
         >
           {loading ? 'Extracting...' : 'Extract Recipe'}
         </button>
-        {user && recipe && (
-          <button
-            className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-2"
-            onClick={handleSave}
-          >
-            Save Recipe
-          </button>
-        )}
       </div>
       {error && <div className="text-red-500 mb-4">{error}</div>}
       {recipe && (
