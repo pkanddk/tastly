@@ -595,7 +595,9 @@ export async function extractRecipeWithDeepSeekOptimized(url: string, isMobile: 
     
     // Parse the markdown content
     const titleMatch = content.match(/# (.*)/);
-    const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
+    const rawTitle = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
+    // Sanitize the title to remove any strange characters
+    const title = rawTitle.replace(/[^\w\s\-,.&'()]/g, '').trim();
     
     const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
     const ingredients = ingredientsMatch 

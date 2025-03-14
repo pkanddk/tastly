@@ -207,7 +207,7 @@ export default function RecipeExtractorClient() {
       <div className="flex mb-4">
         <input
           type="url"
-          className="flex-grow p-2 border rounded mr-2"
+          className="flex-grow p-2 border rounded mr-2 bg-gray-800 text-white placeholder-gray-400"
           placeholder="Enter recipe URL"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
