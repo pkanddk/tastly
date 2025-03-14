@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import RecipeDisplay from '@/app/components/RecipeDisplay';
+import RecipeDisplay from '@/components/RecipeDisplay';
 import { DEFAULT_RECIPE_IMAGE, getRecipeFromCache, cacheRecipeUrl } from '@/app/lib/firebase/firebaseUtils';
 import { Recipe } from '@/app/lib/types';
 import { processRecipeResponse } from '@/app/lib/utils';
@@ -230,97 +230,11 @@ export default function RecipeExtractorClient() {
       </div>
       {error && <div className="text-red-500 mb-4">{error}</div>}
       {recipe && (
-        <div className="custom-recipe-container bg-gray-900 rounded-xl shadow-lg mb-8">
-          {recipeImage && (
-            <div className="recipe-image-container rounded-t-xl overflow-hidden relative h-64 w-full">
-              <img 
-                src={recipeImage} 
-                alt={recipe.title || 'Recipe Image'} 
-                className="object-cover w-full h-full"
-              />
-            </div>
-          )}
-          
-          {/* Recipe Content - Format like Replication Station */}
-          <div className="p-6">
-            <div className="recipe-content">
-              {typeof recipe.markdown === 'string' ? (
-                <div>
-                  {recipe.markdown.split('\n').map((line, index) => {
-                    // Skip the title line (starts with # ) if we're displaying it separately
-                    if (index === 0 && line.startsWith('# ')) {
-                      return null;
-                    }
-                    
-                    // Format headings
-                    if (line.startsWith('## ')) {
-                      return (
-                        <h2 key={index} className="text-xl font-semibold my-4 text-blue-400">
-                          {line.replace('## ', '')}
-                        </h2>
-                      );
-                    }
-                    
-                    // Format lists
-                    if (line.startsWith('- ')) {
-                      return (
-                        <div key={index} className="ml-4 my-1">
-                          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                          <span>{line.replace('- ', '')}</span>
-                        </div>
-                      );
-                    }
-                    
-                    // Format numbered lists
-                    if (/^\d+\.\s/.test(line)) {
-                      return (
-                        <div key={index} className="ml-4 my-1">
-                          <span className="text-blue-400 mr-2">{line.match(/^\d+/)?.[0]}.</span>
-                          <span>{line.replace(/^\d+\.\s/, '')}</span>
-                        </div>
-                      );
-                    }
-                    
-                    // Regular text
-                    return line ? <p key={index} className="my-2">{line}</p> : <div key={index} className="my-4"></div>;
-                  })}
-                </div>
-              ) : (
-                <>
-                  <h1 className="text-2xl font-bold mb-4">{recipe.title || 'Recipe'}</h1>
-                  
-                  {recipe.ingredients && recipe.ingredients.length > 0 && (
-                    <>
-                      <h2 className="text-xl font-semibold my-4 text-blue-400">Ingredients</h2>
-                      <div>
-                        {recipe.ingredients.map((ingredient, i) => (
-                          <div key={i} className="ml-4 my-1">
-                            <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                            <span>{ingredient}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  
-                  {recipe.instructions && recipe.instructions.length > 0 && (
-                    <>
-                      <h2 className="text-xl font-semibold my-4 text-blue-400">Instructions</h2>
-                      <div>
-                        {recipe.instructions.map((instruction, i) => (
-                          <div key={i} className="ml-4 my-1">
-                            <span className="text-blue-400 mr-2">{i+1}.</span>
-                            <span>{instruction}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <RecipeDisplay 
+          recipe={recipe.markdown || recipe} 
+          recipeImage={recipeImage || DEFAULT_RECIPE_IMAGE}
+          url={url}
+        />
       )}
     </div>
   );
