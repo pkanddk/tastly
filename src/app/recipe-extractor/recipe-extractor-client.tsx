@@ -234,7 +234,44 @@ export default function RecipeExtractorClient() {
           {recipeImage && (
             <img src={recipeImage} alt={recipe.title || 'Recipe Image'} className="mb-4 rounded" />
           )}
-          <div className="prose" dangerouslySetInnerHTML={{ __html: recipe.markdown }} />
+          <div className="prose prose-invert bg-white text-black p-6 rounded-lg shadow-lg max-w-none">
+            {typeof recipe.markdown === 'string' ? (
+              <div dangerouslySetInnerHTML={{ 
+                __html: recipe.markdown
+                  .replace(/# (.*)/g, '<h1 class="text-2xl font-bold mb-4">$1</h1>')
+                  .replace(/## (.*)/g, '<h2 class="text-xl font-bold mt-6 mb-3">$1</h2>')
+                  .replace(/\n- /g, '<br/>• ')
+                  .replace(/\n\d+\. /g, '<br/><br/>')
+                  .replace(/\n/g, '<br/>')
+              }} />
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold mb-4">{recipe.title || 'Recipe'}</h1>
+                
+                {recipe.ingredients && recipe.ingredients.length > 0 && (
+                  <>
+                    <h2 className="text-xl font-bold mt-6 mb-3">Ingredients</h2>
+                    <ul className="list-disc pl-5 mb-6">
+                      {recipe.ingredients.map((ingredient, i) => (
+                        <li key={i} className="mb-1">{ingredient}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                
+                {recipe.instructions && recipe.instructions.length > 0 && (
+                  <>
+                    <h2 className="text-xl font-bold mt-6 mb-3">Instructions</h2>
+                    <ol className="list-decimal pl-5">
+                      {recipe.instructions.map((instruction, i) => (
+                        <li key={i} className="mb-3">{instruction}</li>
+                      ))}
+                    </ol>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </>
       )}
     </div>

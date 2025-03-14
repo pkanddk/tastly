@@ -4,66 +4,104 @@ import { anthropic } from '@ai-sdk/anthropic';
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
-  console.log("1. extract-recipe-anthropic called");
   try {
     const { url } = await req.json();
-    console.log("1.1 url:", url); // LOG URL
-
+    
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
-
-    const validatedUrl = new URL(url).toString();
-    console.log("2. URL validated:", validatedUrl);
-
-    const prompt = `Extract recipe from ${validatedUrl}: Title, ingredients (list), instructions (numbered).`;
-
+    
     const apiKey = process.env.ANTHROPIC_API_KEY;
-
-    console.log("3. Anthropic API Key:", apiKey);
-
+    
     if (!apiKey) {
-      console.error("ANTHROPIC_API_KEY is not set");
       return NextResponse.json(
         { error: 'Anthropic API key is not configured' },
         { status: 500 }
       );
     }
-
-    console.log("4. Making Anthropic API call");
-
-    const result = await anthropic("claude-3-5-sonnet-20240620", { apiKey }).messages.create({
-        messages: [
-          { role: 'system', content: 'Extract recipe: title, ingredients (list), instructions (numbered). Ignore everything else.' },
-          { role: 'user', content: prompt },
-        ],
-        max_tokens: 300,
-    });
-
-    console.log("5. Anthropic API call completed", result);
-
-    // Check if the response has the expected structure
-    if (result && result.content && typeof result.content === 'string') {
-      return NextResponse.json({ markdown: result.content });
-    } else if (result && Array.isArray(result.content) && result.content.length > 0 && result.content[0].type === "text" && typeof result.content[0].text === 'string') {
-        // Handle the case where content is an array (as expected)
-        return NextResponse.json({ markdown: result.content[0].text });
+    
+    // Create a simple prompt for recipe extraction
+    const prompt = `Extract the recipe from this URL: ${url}. Format as markdown with:
+# Title
+## Ingredients
+- ingredient 1
+- ingredient 2
+## Instructions
+1. step 1
+2. step 2`;
+    
+    // Set up a timeout for the API call
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    try {
+      // Use the AI SDK to call Anthropic
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-sonnet-20240229',
+          max_tokens: 1000,
+          messages: [
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Anthropic API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const content = data.content[0].text;
+      
+      // Parse the markdown content
+      const titleMatch = content.match(/# (.*)/);
+      const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
+      
+      const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
+      const ingredients = ingredientsMatch 
+        ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : [];
+      
+      const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
+      const instructions = instructionsMatch
+        ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i)
+        : [];
+      
+      return NextResponse.json({
+        title,
+        ingredients,
+        instructions,
+        markdown: content,
+        original: content,
+        method: 'anthropic-mobile',
+        url
+      });
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
-    else {
-      console.error("Unexpected Anthropic response format:", result);
-      return NextResponse.json(
-        { error: 'Failed to extract recipe: Unexpected response format' },
-        { status: 500 }
-      );
-    }
-
   } catch (error) {
     console.error('Anthropic recipe extraction error:', error);
-     // Log the error to see if it's happening before the Anthropic call
-    console.error("Error details:", JSON.stringify(error, null, 2));
-    return NextResponse.json(
-      { error: 'Failed to extract recipe' },
-      { status: 500 }
-    );
+    
+    return NextResponse.json({
+      title: "Recipe Extraction Failed",
+      ingredients: ["Could not extract ingredients"],
+      instructions: ["Please try again later or manually copy the recipe"],
+      markdown: "# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later or manually copy the recipe from the original website.",
+      method: 'error-fallback',
+      url
+    }, { status: 200 });
   }
 } 
