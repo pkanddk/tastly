@@ -212,8 +212,7 @@ export default function RecipeExtractorClient() {
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-6 text-center">Recipe Extractor</h1>
       
-      <form onSubmit={handleSubmit} className="w-full max-w-lg mx-auto">
-        {/* Responsive layout - flex-col on mobile, flex-row on desktop */}
+      <form onSubmit={handleSubmit} className="w-full mx-auto">
         <div className="flex flex-col sm:flex-row gap-4">
           <input
             type="url"
