@@ -22,22 +22,10 @@ const nextConfig = {
   async rewrites() {
     return [];
   },
-  api: {
-    responseLimit: false,
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-    externalResolver: true,
-  },
   experimental: {
     serverComponentsExternalPackages: ['puppeteer-core'],
     serverActions: {
       bodySizeLimit: '10mb',
-    },
-  },
-  functions: {
-    'api/extract-recipe': {
-      maxDuration: 300,
     },
   },
 };

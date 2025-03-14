@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
         instructions: ["Please try again later or manually copy the recipe"],
         markdown: "# Recipe Extraction Timed Out\n\nThe recipe extraction timed out. Please try again later or manually copy the recipe.",
         method: 'timeout-fallback',
-        url
+        url: url
       }, { status: 200 });
     }
     
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       instructions: ["Please try again later or manually copy the recipe"],
       markdown: "# Recipe Extraction Failed\n\nThe recipe extraction failed. Please try again later or manually copy the recipe.",
       method: 'error-fallback',
-      url
+      url: url
     }, { status: 200 });
   }
 } 
