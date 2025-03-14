@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import RecipeDisplay from '@/components/RecipeDisplay';
-import { DEFAULT_RECIPE_IMAGE, getRecipeFromCache, cacheRecipeUrl } from '@/lib/firebase/firebaseUtils';
+import RecipeDisplay from '@/app/components/RecipeDisplay';
+import { DEFAULT_RECIPE_IMAGE, getRecipeFromCache, cacheRecipeUrl } from '@/app/lib/firebase/firebaseUtils';
 import { Recipe } from '@/app/lib/types';
 import { processRecipeResponse } from '@/app/lib/utils';
 import { extractRecipe, extractRecipeWithDeepSeekOptimized } from '@/app/lib/server/recipeExtractor';
