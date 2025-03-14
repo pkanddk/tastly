@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { User } from "firebase/auth";
 import { auth } from "../firebase/firebase";
 
@@ -51,6 +51,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, [initialCheckDone]);
+
+  // Handle redirect result
+  useEffect(() => {
+    async function checkRedirectResult() {
+      if (localStorage.getItem('auth_pending')) {
+        try {
+          console.log("Checking redirect result");
+          const result = await getRedirectResult(auth);
+          if (result) {
+            console.log("Redirect sign-in successful", result.user.uid);
+            localStorage.removeItem('auth_pending');
+          }
+        } catch (error) {
+          console.error("Error getting redirect result:", error);
+          localStorage.removeItem('auth_pending');
+        }
+      }
+    }
+    
+    checkRedirectResult();
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>

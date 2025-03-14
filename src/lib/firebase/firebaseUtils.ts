@@ -53,11 +53,14 @@ export const signOut = async (callback?: () => void) => {
 
 export const signInWithGoogle = async () => {
   try {
+    console.log("Starting Google sign-in process");
     const provider = new GoogleAuthProvider();
     
     // First try with popup
     try {
+      console.log("Attempting popup sign-in");
       const result = await signInWithPopup(auth, provider);
+      console.log("Popup sign-in successful", result.user.uid);
       return result.user;
     } catch (popupError: any) {
       console.error("Popup sign-in error:", popupError);
@@ -69,18 +72,20 @@ export const signInWithGoogle = async () => {
         popupError.code === 'auth/popup-closed-by-user'
       ) {
         console.log("Falling back to redirect method...");
-        // Use redirect as fallback
+        
+        // Store a flag indicating auth is in progress
+        localStorage.setItem('auth_pending', 'true');
+        
+        // Try redirect method as fallback
         await signInWithRedirect(auth, provider);
-        // Note: This will redirect the page, so no code after this will execute
-        // until the user returns to the app
-      } else {
-        // For other errors, rethrow
-        throw popupError;
+        return null; // Will redirect, so return null
       }
+      
+      throw popupError;
     }
   } catch (error) {
     console.error("Google sign-in error:", error);
-    throw error;
+    return null;
   }
 };
 
