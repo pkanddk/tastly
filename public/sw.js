@@ -1,62 +1,30 @@
-// This is the service worker with the combined offline experience (Offline page + Offline copy of pages)
-
-const CACHE = "tastly-offline-v1";
-const OFFLINE_URL = "/offline";
-
-// Install stage sets up the offline page in the cache and opens a new cache
-self.addEventListener("install", function(event) {
+// This is a minimal service worker that handles basic caching
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then(function(cache) {
+    caches.open('tastly-v1').then((cache) => {
       return cache.addAll([
-        OFFLINE_URL,
-        "/",
-        "/icon-192.jpg",
-        "/icon-512.jpg",
-        "/apple-icon.jpg",
-        "/images/banner.jpg"
-      ]);
+        '/',
+        '/index.html',
+        '/images/tastly-banner.jpg'
+      ]).catch(error => {
+        console.error('Failed to cache resources:', error);
+        // Continue even if caching fails
+        return [];
+      });
     })
   );
 });
 
-// If any fetch fails, it will look for the request in the cache and serve it from there first
-self.addEventListener("fetch", function(event) {
-  if (event.request.method !== "GET") return;
-
+self.addEventListener('fetch', (event) => {
   event.respondWith(
-    fetch(event.request)
-      .then(function(response) {
-        // If request was successful, add result to cache
-        event.waitUntil(updateCache(event.request, response.clone()));
-        return response;
-      })
-      .catch(function(error) {
-        // Check to see if you have it in the cache
-        // Return response
-        // If not in the cache, then return the offline page
-        return fromCache(event.request).catch(function() {
-          return caches.match(OFFLINE_URL);
-        });
-      })
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request).catch(() => {
+        // Return a fallback for navigation requests
+        if (event.request.mode === 'navigate') {
+          return caches.match('/');
+        }
+        return null;
+      });
+    })
   );
-});
-
-function fromCache(request) {
-  // Check to see if you have it in the cache
-  // Return response
-  // If not in the cache, then return
-  return caches.open(CACHE).then(function(cache) {
-    return cache.match(request).then(function(matching) {
-      if (!matching || matching.status === 404) {
-        return Promise.reject("no-match");
-      }
-      return matching;
-    });
-  });
-}
-
-function updateCache(request, response) {
-  return caches.open(CACHE).then(function(cache) {
-    return cache.put(request, response);
-  });
-} 
+}); 

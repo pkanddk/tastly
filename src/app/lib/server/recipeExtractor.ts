@@ -516,8 +516,14 @@ export async function extractRecipeWithDeepSeekMobile(url: string) {
     // Parse the markdown content
     const titleMatch = content.match(/# (.*)/);
     const rawTitle = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
-    // More aggressive sanitization to remove any strange characters
-    const title = rawTitle.replace(/[^\w\s\-,.&()]/g, '').trim();
+    // More aggressive title cleaning
+    // First remove any trailing numbers or Roman numerals with spaces/punctuation
+    const cleanedTitle = rawTitle
+      .replace(/\s+[IVX]+$|\s+\d+$/, '') // Remove trailing Roman numerals or numbers
+      .replace(/[^\w\s\-,.&()]/g, '')    // Remove special characters
+      .trim();
+
+    const title = cleanedTitle || 'Recipe';
     
     const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
     const ingredients = ingredientsMatch 
@@ -608,8 +614,14 @@ Format as:
     // Parse the markdown content
     const titleMatch = content.match(/# (.*)/);
     const rawTitle = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
-    // More aggressive sanitization to remove any strange characters
-    const title = rawTitle.replace(/[^\w\s\-,.&()]/g, '').trim();
+    // More aggressive title cleaning
+    // First remove any trailing numbers or Roman numerals with spaces/punctuation
+    const cleanedTitle = rawTitle
+      .replace(/\s+[IVX]+$|\s+\d+$/, '') // Remove trailing Roman numerals or numbers
+      .replace(/[^\w\s\-,.&()]/g, '')    // Remove special characters
+      .trim();
+
+    const title = cleanedTitle || 'Recipe';
     
     const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
     const ingredients = ingredientsMatch 

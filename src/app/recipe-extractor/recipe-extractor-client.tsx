@@ -14,6 +14,9 @@ function isMobileDevice() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+// Add this at the top of the component
+const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
 export default function RecipeExtractorClient() {
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<Recipe | null>(null);
@@ -201,23 +204,26 @@ export default function RecipeExtractorClient() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4 text-center">Recipe Extractor</h1>
-      <div className="flex mb-4">
+      <h1 className="text-2xl font-bold mb-6 text-center">Recipe Extractor</h1>
+      
+      {/* Use a different layout for mobile */}
+      <div className={`${isMobile ? 'flex flex-col gap-4' : 'flex mb-4'}`}>
         <input
           type="url"
-          className="flex-grow p-2 border rounded mr-2 bg-gray-800 text-white placeholder-gray-400"
+          className={`${isMobile ? 'w-full' : 'flex-grow'} p-3 border rounded-xl bg-gray-800 text-white placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
           placeholder="Enter recipe URL"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
         <button
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          className={`${isMobile ? 'w-full' : ''} bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-colors`}
           onClick={handleExtract}
           disabled={loading}
         >
           {loading ? 'Extracting...' : 'Extract Recipe'}
         </button>
       </div>
+      
       {error && <div className="text-red-500 mb-4">{error}</div>}
       {recipe && (
         <RecipeDisplay 
