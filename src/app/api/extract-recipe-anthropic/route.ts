@@ -7,6 +7,7 @@ export async function POST(req: NextRequest) {
   console.log("1. extract-recipe-anthropic called");
   try {
     const { url } = await req.json();
+    console.log("1.1 url:", url); // LOG URL
 
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('Anthropic recipe extraction error:', error);
+     // Log the error to see if it's happening before the Anthropic call
+    console.error("Error details:", JSON.stringify(error, null, 2));
     return NextResponse.json(
       { error: 'Failed to extract recipe' },
       { status: 500 }
