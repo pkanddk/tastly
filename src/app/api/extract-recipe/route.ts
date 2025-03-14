@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractRecipeWithDeepSeekOptimized } from '@/app/lib/server/recipeExtractor';
 
-export const config = {
-  runtime: 'edge', // Use edge runtime for better performance
-  maxDuration: 60, // Set maximum duration to 60 seconds
-};
+// This is the correct way to set the runtime in Next.js App Router
+export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
   try {
