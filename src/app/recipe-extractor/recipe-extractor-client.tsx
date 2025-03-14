@@ -213,11 +213,11 @@ export default function RecipeExtractorClient() {
       <h1 className="text-2xl font-bold mb-6 text-center">Recipe Extractor</h1>
       
       <form onSubmit={handleSubmit} className="w-full max-w-lg mx-auto">
-        {/* Mobile layout with stacked controls */}
-        <div className="flex flex-col gap-4">
+        {/* Responsive layout - flex-col on mobile, flex-row on desktop */}
+        <div className="flex flex-col sm:flex-row gap-4">
           <input
             type="url"
-            className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full sm:flex-grow px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter recipe URL"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -225,7 +225,7 @@ export default function RecipeExtractorClient() {
           />
           <button
             type="submit"
-            className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors"
+            className="w-full sm:w-auto sm:whitespace-nowrap bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors"
             disabled={loading}
           >
             {loading ? 'Extracting...' : 'Extract Recipe'}
