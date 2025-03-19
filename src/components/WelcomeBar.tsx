@@ -33,24 +33,31 @@ export default function WelcomeBar() {
       <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
         {/* Left side - Back button and dynamic text */}
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => router.back()}
-            className="text-gray-400 hover:text-white"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          
           {user && !loading ? (
-            <div className="text-white">
-              <span className="font-medium">Welcome back, </span>
-              <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
-            </div>
+            <button 
+              onClick={() => router.back()}
+              className="flex items-center gap-2 text-white hover:text-gray-300 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <div>
+                <span className="font-medium">Welcome back, </span>
+                <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
+              </div>
+            </button>
           ) : (
-            <span className="text-xl font-bold text-white hover:text-blue-400 transition-colors">
-              Tastly
-            </span>
+            <button 
+              onClick={() => router.back()}
+              className="flex items-center gap-2 hover:text-gray-300 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="text-xl font-bold text-white hover:text-blue-400 transition-colors">
+                Tastly
+              </span>
+            </button>
           )}
         </div>
         
