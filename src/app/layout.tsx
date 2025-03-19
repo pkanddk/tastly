@@ -48,10 +48,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-icon.jpg" />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>" />
       </head>
-      <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col`}>
+      <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col relative`}>
         <AuthProvider>
           <WelcomeBar />
-          <main className="flex-grow pt-16">
+          <main className="flex-grow pt-16 relative z-0">
             {children}
           </main>
           <Footer />

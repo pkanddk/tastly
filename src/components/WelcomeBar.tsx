@@ -29,7 +29,7 @@ export default function WelcomeBar() {
   };
   
   return (
-    <nav className="bg-gray-900 border-b border-gray-800 shadow-md fixed top-0 left-0 right-0 w-full z-50">
+    <nav className="bg-gray-900 border-b border-gray-800 shadow-md fixed top-0 left-0 right-0 w-full z-50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center gap-3">
           {showBackButton && (
