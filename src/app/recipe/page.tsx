@@ -1,12 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import RecipeDisplay from '@/components/RecipeDisplay';
 import { DEFAULT_RECIPE_IMAGE } from '@/lib/firebase/firebaseUtils';
 import { useAuth } from '@/lib/hooks/useAuth';
 
-export default function RecipePage() {
+// Create a loading component
+function LoadingState() {
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-white text-lg">Loading recipe...</p>
+      </div>
+    </div>
+  );
+}
+
+// Create a component for the recipe content
+function RecipeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const url = searchParams.get('url');
@@ -68,17 +81,6 @@ export default function RecipePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-white text-lg">Extracting recipe...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-500 text-lg mb-4">{error}</p>
           <button
@@ -104,5 +106,14 @@ export default function RecipePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Main page component with Suspense
+export default function RecipePage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <RecipeContent />
+    </Suspense>
   );
 } 
