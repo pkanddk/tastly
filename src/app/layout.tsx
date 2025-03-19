@@ -51,7 +51,7 @@ export default function RootLayout({
       <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col`}>
         <AuthProvider>
           <WelcomeBar />
-          <main className="flex-grow">
+          <main className="flex-grow pt-16">
             {children}
           </main>
           <Footer />
