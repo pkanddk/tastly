@@ -8,6 +8,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { TAGLINES } from '@/lib/constants';
 import TaglineIcon from '@/components/TaglineIcon';
+import RecipeDisplay from '@/components/RecipeDisplay';
+import { DEFAULT_RECIPE_IMAGE } from '@/lib/firebase/firebaseUtils';
+import { Dialog } from '@headlessui/react';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
@@ -15,6 +18,11 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [recipe, setRecipe] = useState<any>(null);
+  const [recipeImage, setRecipeImage] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPanelOpen, setPanelOpen] = useState(false);
   
   useEffect(() => {
     setMounted(true);
@@ -22,14 +30,44 @@ export default function HomePage() {
   
   if (!mounted) return null;
   
+  const fetchImage = async (recipeUrl: string) => {
+    try {
+      const response = await fetch('/api/extract-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: recipeUrl }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setRecipeImage(data.imageUrl);
+    } catch (err) {
+      console.error('Error fetching image:', err);
+      // Do not set a global error for image fetching failures
+    }
+  };
+  
   const handleExtractRecipe = async () => {
     if (!url) return;
     
     try {
       setIsLoading(true);
-      router.push(`/recipe-extractor?url=${encodeURIComponent(url)}`);
+      setError(null);
+      
+      // Store the URL in localStorage so we can access it on the recipe page
+      localStorage.setItem('recipeUrl', url);
+      
+      // Navigate to the recipe page with the URL as a query parameter
+      router.push(`/recipe?url=${encodeURIComponent(url)}`);
     } catch (error) {
-      console.error('Error navigating to recipe extractor:', error);
+      console.error('Error extracting recipe:', error);
+      setError('Failed to extract recipe. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -73,19 +111,58 @@ export default function HomePage() {
           </div>
         </div>
         
+        {/* URL Input Section */}
+        <div className="flex flex-col items-center mb-12">
+          <form onSubmit={(e) => { e.preventDefault(); handleExtractRecipe(); }} className="w-full max-w-3xl">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Paste recipe URL here"
+                className="flex-grow px-6 py-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
+                required
+              />
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full sm:w-auto whitespace-nowrap px-6 py-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md text-lg"
+              >
+                {isLoading ? 'Extracting...' : 'Extract Recipe'}
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        {/* Recipe Display */}
+        <div
+          id="recipe-panel"
+          className={`transition-all duration-300 ease-in-out ${
+            isPanelOpen ? 'max-h-[80vh] opacity-100' : 'max-h-0 opacity-0'
+          } overflow-hidden`}
+        >
+          <div className="bg-gray-800 rounded-xl mt-4 p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Extracted Recipe</h2>
+              <button onClick={() => setPanelOpen(false)} className="text-gray-400 hover:text-white">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              </button>
+            </div>
+            {recipe && (
+              <RecipeDisplay 
+                recipe={recipe?.markdown || recipe}
+                recipeImage={recipeImage || DEFAULT_RECIPE_IMAGE}
+                url={url}
+              />
+            )}
+          </div>
+        </div>
+        
         {/* Action Buttons - Show for all users */}
         <div className="flex flex-col items-center mb-12">
           <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4 w-full max-w-3xl">
-            <Link 
-              href="/recipe-extractor" 
-              className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium py-4 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors text-lg"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Extract New Recipe
-            </Link>
-            
             <Link 
               href="/replication-station" 
               className="w-full sm:flex-1 bg-purple-600 hover:bg-purple-500 text-white font-medium py-4 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors text-lg"

@@ -6,7 +6,13 @@ import { END_MESSAGES } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import GroceryList from './GroceryList';
 
-export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: string, recipeImage: string, url?: string }) {
+interface RecipeDisplayProps {
+  recipe: any; // or define a more specific type
+  recipeImage?: string;
+  url?: string;
+}
+
+export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDisplayProps) {
   // Add state for showing/hiding the shopping list
   const [showShoppingList, setShowShoppingList] = useState(false);
   
@@ -29,9 +35,6 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
   
   // Add this state variable with the other state declarations
   const [isAlreadySaved, setIsAlreadySaved] = useState(false);
-  
-  // Add this state at the top of the component
-  const [isSaved, setIsSaved] = useState(false);
   
   // Generate a unique storage key for this recipe
   const storageKey = useMemo(() => {
@@ -219,11 +222,8 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
     );
   };
   
-  // Don't try to parse as JSON - handle as markdown or object
-  const parsedRecipe = typeof recipe === 'object' ? recipe : { 
-    title: 'Recipe',
-    markdown: recipe 
-  };
+  // Handle different recipe formats
+  const content = typeof recipe === 'string' ? recipe : recipe?.markdown || '';
   
   // Add this effect to check if the recipe is already saved
   useEffect(() => {
@@ -263,6 +263,10 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
         return;
       }
       
+      if (isAlreadySaved) {
+        return; // Already saved, do nothing
+      }
+      
       try {
         setIsSaving(true);
         
@@ -284,8 +288,8 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
         }
         
         await saveRecipe(user.uid, recipeData);
+        setIsAlreadySaved(true);
         setSaveSuccess(true);
-        setIsSaved(true);
         
         // Reset success message after 3 seconds
         setTimeout(() => setSaveSuccess(false), 3000);
@@ -305,24 +309,25 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
     const ingredientsBySection = organizeBySection(allIngredients);
     
     return (
-      <div className="custom-recipe-container bg-gray-900 rounded-xl shadow-lg mb-8">
-        <div className="recipe-image-container rounded-t-xl overflow-hidden relative h-64 w-full">
-          <Image 
-            src={recipeImage}
-            alt="Recipe image"
-            fill
-            sizes="(max-width: 768px) 100vw, 768px"
-            className="object-cover"
-          />
-        </div>
+      <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+        {recipeImage && (
+          <div className="relative w-full h-48 mb-4 rounded-lg overflow-hidden">
+            <Image
+              src={recipeImage}
+              alt="Recipe"
+              fill
+              className="object-cover"
+            />
+          </div>
+        )}
         
-        {/* Action Buttons - NEW SECTION */}
+        {/* Action Buttons at the top */}
         <div className="p-4 bg-gray-700 flex justify-center gap-4">
           <button
             onClick={handleSaveRecipe}
-            disabled={isSaving || isSaved}
+            disabled={isSaving || isAlreadySaved}
             className={`flex items-center gap-2 ${
-              isSaved 
+              isAlreadySaved 
                 ? 'bg-green-600 hover:bg-green-600' 
                 : 'bg-blue-600 hover:bg-blue-500'
             } text-white px-4 py-2 rounded-lg transition-colors`}
@@ -330,7 +335,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
             </svg>
-            {isSaving ? 'Saving...' : isSaved ? 'Saved' : 'Save Recipe'}
+            {isSaving ? 'Saving...' : isAlreadySaved ? 'Saved' : 'Save Recipe'}
           </button>
           
           <button
@@ -345,15 +350,26 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
         </div>
         
         {/* Recipe Content */}
-        <div className="p-6">
-          <div dangerouslySetInnerHTML={{ __html: formattedMarkdown }} />
-          
-          {/* End message - Updated with yellow text and better centering */}
-          <div className="mt-8 p-5 bg-gray-700 rounded-lg text-center">
-            <p className="text-yellow-300 text-base italic">
-              {endMessage}
-            </p>
+        <div className="mt-6 recipe-content" dangerouslySetInnerHTML={{ __html: formattedMarkdown }} />
+        
+        {url && (
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <a 
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 text-sm"
+            >
+              View Original Recipe
+            </a>
           </div>
+        )}
+        
+        {/* End message */}
+        <div className="mt-8 p-5 bg-gray-700 rounded-lg text-center">
+          <p className="text-yellow-300 text-base italic">
+            {endMessage}
+          </p>
         </div>
         
         {/* Shopping List Modal */}
@@ -466,17 +482,35 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: { recipe: st
   
   // If we have a structured recipe object, render it
   return (
-    <div className="custom-recipe-container bg-gray-900 rounded-xl shadow-lg mb-8">
-      <div className="recipe-image-container rounded-t-xl overflow-hidden relative h-64 w-full">
-        <Image 
-          src={recipeImage}
-          alt="Recipe image"
-          fill
-          sizes="(max-width: 768px) 100vw, 768px"
-          className="object-cover"
-        />
+    <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+      {recipeImage && (
+        <div className="relative w-full h-48 mb-4 rounded-lg overflow-hidden">
+          <Image
+            src={recipeImage}
+            alt="Recipe"
+            fill
+            className="object-cover"
+          />
+        </div>
+      )}
+      
+      <div className="prose prose-invert max-w-none">
+        {/* Use a markdown renderer here if you're using markdown */}
+        {content}
       </div>
-      {/* ... rest of the component ... */}
+      
+      {url && (
+        <div className="mt-4 pt-4 border-t border-gray-700">
+          <a 
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 text-sm"
+          >
+            View Original Recipe
+          </a>
+        </div>
+      )}
     </div>
   );
 }

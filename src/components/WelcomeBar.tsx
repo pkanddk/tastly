@@ -31,40 +31,38 @@ export default function WelcomeBar() {
   return (
     <nav className="bg-gray-900 border-b border-gray-800 shadow-md fixed top-0 left-0 right-0 w-full z-50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          {showBackButton && (
-            <button 
-              onClick={() => router.back()}
-              className="text-gray-400 hover:text-white p-1"
-              aria-label="Go back"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          )}
+        {/* Left side - Back button and dynamic text */}
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => router.back()}
+            className="text-gray-400 hover:text-white"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
           
-          <Link href="/" className="text-xl font-bold text-white hover:text-blue-400 transition-colors">
-            Tastly
-          </Link>
+          {user && !loading ? (
+            <div className="text-white">
+              <span className="font-medium">Welcome back, </span>
+              <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
+            </div>
+          ) : (
+            <span className="text-xl font-bold text-white hover:text-blue-400 transition-colors">
+              Tastly
+            </span>
+          )}
         </div>
         
-        {/* Center area - only for signed in users */}
-        <div className="flex-1 flex justify-center">
+        {/* Center area - navigation links */}
+        <div className="flex-1 flex justify-center items-center">
           {user && !loading && (
-            <div className="flex items-center gap-4">
-              <div className="text-white hidden sm:block">
-                <span className="font-medium">Welcome back, </span>
-                <span className="font-bold text-blue-400">{user.displayName?.split(' ')[0] || 'there'}</span>
-              </div>
-              
-              <div className="h-6 border-l border-gray-600 hidden sm:block"></div>
-              
-              <Link href="/recipe-extractor" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
+            <div className="flex items-center justify-center gap-6 w-full max-w-xl">
+              <Link href="/" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                 </svg>
-                <span className="hidden sm:inline">Extract Recipe</span>
+                <span className="hidden sm:inline">Home</span>
               </Link>
               
               <Link href="/my-recipes" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">

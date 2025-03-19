@@ -1,76 +1,128 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractRecipeWithDeepSeekOptimized } from '@/app/lib/server/recipeExtractor';
+import OpenAI from 'openai';
 
 // This is the correct way to set the runtime in Next.js App Router
 export const runtime = 'edge';
 
 export async function POST(req: NextRequest) {
+  let requestUrl = ''; // Declare at top level to fix linter error
+  
   try {
-    console.log("extract-recipe API route called");
-    
     const { url } = await req.json();
+    requestUrl = url; // Store for error handling
     
     if (!url) {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
     }
     
-    // Set a shorter timeout for the extraction
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'OpenAI API key is not configured' },
+        { status: 500 }
+      );
+    }
+    
+    // Set up a timeout for the API call
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 seconds for desktop
     
     try {
-      console.log("Starting recipe extraction for:", url);
-      const extractPromise = extractRecipeWithDeepSeekOptimized(url, false);
-
-      // Race the extraction against the timeout
-      const recipe = await Promise.race([
-        extractPromise,
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Extraction timed out')), 15000);
-        })
-      ]);
-
-      clearTimeout(timeoutId);
-      console.log("Recipe extraction successful");
+      // Initialize OpenAI client
+      const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY || '',
+      });
       
-      return NextResponse.json(recipe);
-    } catch (extractionError) {
-      clearTimeout(timeoutId);
-      console.error("Extraction error:", extractionError);
+      // Make the API call with the timeout
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a recipe extraction expert. Extract recipes and format them in a consistent markdown structure.
+Always include these sections in this exact order:
+
+1. Title with a single # (main heading)
+2. Ingredients section with bullet points
+3. Instructions section with numbered steps
+4. Cooking Time and Servings section
+5. Notes section for tips and variations
+
+Use this exact format:
+
+# [Recipe Name]
+
+## Ingredients
+- [ingredient with amount]
+- [ingredient with amount]
+
+## Instructions
+1. [detailed step]
+2. [detailed step]
+
+## Cooking Time and Servings
+- Preparation Time: [time] minutes
+- Cooking Time: [time] minutes
+- Total Time: [time] minutes
+- Servings: [number]
+
+## Notes
+- [important tips]
+- [variations]
+- [storage instructions]`
+          },
+          {
+            role: "user",
+            content: `Extract and format the recipe from this URL: ${url}. Follow the format exactly as specified. Ensure all sections are present and properly formatted.`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 1500,
+        stream: false
+      });
       
-      // Return a basic fallback result
+      clearTimeout(timeoutId);
+      
+      const content = completion.choices[0].message.content || '';
+      
+      // Parse the markdown content
+      const titleMatch = content.match(/# (.*)/);
+      const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
+      
+      const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
+      const ingredients = ingredientsMatch 
+        ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : [];
+      
+      const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
+      const instructions = instructionsMatch
+        ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i)
+        : [];
+      
       return NextResponse.json({
-        title: "Recipe Extraction Failed",
-        ingredients: ["Could not extract ingredients due to timeout"],
-        instructions: ["Please try again later or manually copy the recipe"],
-        markdown: "# Recipe Extraction Failed\n\nThe recipe extraction timed out. Please try again later or manually copy the recipe.",
-        original: "Extraction failed",
-        method: 'error-fallback',
-        url: url
-      }, { status: 200 });
+        title,
+        ingredients,
+        instructions,
+        markdown: content,
+        original: content,
+        method: 'openai-gpt4o-mini',
+        url: requestUrl
+      });
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
+  } catch (error) {
+    console.error('OpenAI recipe extraction error:', error);
     
-  } catch (error: any) {
-    console.error('Recipe extraction error:', error);
-    
-    if (error.name === 'AbortError') {
-      return NextResponse.json({ 
-        title: "Recipe Extraction Timed Out",
-        ingredients: ["Could not extract ingredients due to timeout"],
-        instructions: ["Please try again later or manually copy the recipe"],
-        markdown: "# Recipe Extraction Timed Out\n\nThe recipe extraction timed out. Please try again later or manually copy the recipe.",
-        method: 'timeout-fallback',
-        url: url
-      }, { status: 200 });
-    }
-    
-    return NextResponse.json({ 
+    return NextResponse.json({
       title: "Recipe Extraction Failed",
-      ingredients: ["Could not extract ingredients due to an error"],
+      ingredients: ["Could not extract ingredients"],
       instructions: ["Please try again later or manually copy the recipe"],
-      markdown: "# Recipe Extraction Failed\n\nThe recipe extraction failed. Please try again later or manually copy the recipe.",
+      markdown: "# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later or manually copy the recipe from the original website.",
       method: 'error-fallback',
-      url: url
+      url: requestUrl // Use the stored URL
     }, { status: 200 });
   }
 } 
