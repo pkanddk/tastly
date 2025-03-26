@@ -7,24 +7,45 @@ import { DEFAULT_RECIPE_IMAGE } from '@/lib/firebase/firebaseUtils';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { TAGLINES } from '@/lib/constants';
 import TaglineIcon from '@/components/TaglineIcon';
-import { Icon } from '@heroicons/react/24/outline';
 
-// Create a loading component
+// Create a client-side only loading component
 function LoadingState() {
+  const [taglineIndex, setTaglineIndex] = useState(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const interval = setInterval(() => {
+      setTaglineIndex(current => (current + 1) % TAGLINES.length);
+    }, 3000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Don't render anything on server-side
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4 p-8 rounded-xl bg-black/20 backdrop-blur-sm">
-        <div className="relative">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <div className="absolute inset-0 w-12 h-12 border-4 border-primary/30 border-t-transparent rounded-full animate-spin-slow"></div>
+        <div className="relative flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="absolute inset-0 w-12 h-12 border-4 border-blue-400/30 border-t-transparent rounded-full animate-spin-slow"></div>
         </div>
+
         <div className="text-center">
-          <p className="text-white text-lg mb-2">Extracting recipe...</p>
-          <div className="flex items-center gap-2 text-primary animate-fade-in">
-            <span className="w-5 h-5">
-              <TaglineIcon icon={TAGLINES[currentTaglineIndex].icon} />
+          <p className="text-white text-lg mb-4">Extracting recipe...</p>
+          <div className="inline-flex items-center justify-center gap-2 text-blue-400 animate-fade-in transition-all duration-500 ease-in-out hover:scale-105">
+            <span className="w-5 h-5 flex-shrink-0">
+              <TaglineIcon icon={TAGLINES[taglineIndex].icon} />
             </span>
-            <p>{TAGLINES[currentTaglineIndex].text}</p>
+            <p className="text-lg">{TAGLINES[taglineIndex].text}</p>
           </div>
         </div>
       </div>
@@ -42,7 +63,6 @@ function RecipeContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const [currentTaglineIndex, setCurrentTaglineIndex] = useState(0);
 
   useEffect(() => {
     const extractRecipe = async () => {
@@ -93,36 +113,8 @@ function RecipeContent() {
     extractRecipe();
   }, [url, router]);
 
-  useEffect(() => {
-    if (!loading) return;
-    
-    const interval = setInterval(() => {
-      setCurrentTaglineIndex(current => (current + 1) % TAGLINES.length);
-    }, 3000); // Rotate every 3 seconds
-    
-    return () => clearInterval(interval);
-  }, [loading]);
-
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4 p-8 rounded-xl bg-black/20 backdrop-blur-sm">
-          <div className="relative flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            <div className="absolute inset-0 w-12 h-12 border-4 border-primary/30 border-t-transparent rounded-full animate-spin-slow"></div>
-          </div>
-          <div className="text-center">
-            <p className="text-foreground text-lg mb-4">Extracting recipe...</p>
-            <div className="inline-flex items-center justify-center gap-2 text-primary animate-fade-in transition-all duration-500 ease-in-out hover:scale-105">
-              <span className="w-5 h-5 flex-shrink-0">
-                <TaglineIcon icon={TAGLINES[currentTaglineIndex].icon} />
-              </span>
-              <p className="text-lg">{TAGLINES[currentTaglineIndex].text}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   return (
@@ -140,7 +132,7 @@ function RecipeContent() {
   );
 }
 
-// Main page component with Suspense
+// Main page component
 export default function RecipePage() {
   return (
     <Suspense fallback={<LoadingState />}>
