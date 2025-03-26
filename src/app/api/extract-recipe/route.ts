@@ -254,7 +254,7 @@ Note: Use concise category names - if category is "For the Meat Sauce", use "###
       title: "Recipe Extraction Failed",
       ingredients: ["Could not extract ingredients"],
       instructions: ["Please try again later or manually copy the recipe"],
-      markdown: "# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later or manually copy the recipe from the original website.",
+      markdown: `# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later, or [View the original recipe here](${requestUrl}).`,
       method: 'error-fallback',
       url: requestUrl // Use the stored URL
     }, { status: 200 });

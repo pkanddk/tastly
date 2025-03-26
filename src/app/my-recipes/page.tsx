@@ -11,16 +11,19 @@ export default function MyRecipesPage() {
   const { user, loading } = useAuth();
   const [recipes, setRecipes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   
   useEffect(() => {
     async function loadRecipes() {
       if (user) {
         try {
+          setError(null);
           const userRecipes = await getRecipesByUser(user.uid);
           setRecipes(userRecipes);
         } catch (error) {
           console.error('Error loading recipes:', error);
+          setError('Failed to load recipes. Please try again later.');
         } finally {
           setIsLoading(false);
         }
@@ -58,6 +61,24 @@ export default function MyRecipesPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-gray-800 rounded-xl p-6 text-center">
+          <h1 className="text-2xl font-bold mb-4">My Recipes</h1>
+          <p className="text-red-400 mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -106,15 +127,17 @@ export default function MyRecipesPage() {
               <div className="relative h-48 w-full">
                 <Image
                   src={recipe.imageUrl || DEFAULT_RECIPE_IMAGE}
-                  alt={recipe.title}
+                  alt={recipe.title || 'Recipe'}
                   fill
                   className="object-cover"
                 />
               </div>
               <div className="p-4">
-                <h2 className="text-xl font-bold mb-2">{recipe.title}</h2>
+                <h2 className="text-xl font-bold mb-2">{recipe.title || 'Untitled Recipe'}</h2>
                 <p className="text-gray-400 text-sm mb-4">
-                  Saved on {new Date(recipe.createdAt).toLocaleDateString()}
+                  {recipe.createdAt ? 
+                    `Saved on ${new Date(recipe.createdAt).toLocaleDateString()}` : 
+                    'Recently saved'}
                 </p>
                 <div className="flex justify-between">
                   <button 

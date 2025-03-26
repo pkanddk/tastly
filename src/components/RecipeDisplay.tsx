@@ -1,6 +1,8 @@
 import Image from 'next/image';
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useGroceryList } from '@/lib/contexts/GroceryListContext';
+import { useIngredientChecklist } from '@/lib/hooks/useIngredientChecklist';
 import { saveRecipe, signInWithGoogle, checkIfRecipeSaved } from '@/lib/firebase/firebaseUtils';
 import { END_MESSAGES } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
@@ -50,6 +52,8 @@ interface StructuredRecipe {
 export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDisplayProps) {
   // Add state for showing/hiding the shopping list
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const { addRecipeToGroceryList } = useGroceryList();
+  const [recipeAddedToList, setRecipeAddedToList] = useState(false);
   
   // Add state for recipe saving
   const { user } = useAuth();
@@ -71,22 +75,26 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
   // Add this state variable with the other state declarations
   const [isAlreadySaved, setIsAlreadySaved] = useState(false);
   
-  // Generate a unique storage key for this recipe
-  const storageKey = useMemo(() => {
+  // Generate a consistent ID for the recipe
+  const recipeId = useMemo(() => {
     if (typeof recipe === 'string') {
-      // Extract title from markdown
-      const titleMatch = recipe.match(/# (.+)$/m);
-      const title = titleMatch ? titleMatch[1].replace(/[^a-zA-Z0-9]/g, '') : '';
-      return `grocery-list-${title}-${Date.now()}`;
+      // Use title from markdown if available, or just hash of the content
+      const title = (recipe as string).match(/# (.+)$/m)?.[1] || '';
+      return `recipe-${title.replace(/\s+/g, '-').toLowerCase() || Math.random().toString(36).substring(2, 9)}`;
+    } else {
+      // Use title for structured recipes
+      return `recipe-${recipe.title.replace(/\s+/g, '-').toLowerCase()}`;
     }
-    return `grocery-list-${Date.now()}`;
   }, [recipe]);
+  
+  // Use our ingredient checklist hook
+  const { toggleIngredient, isIngredientChecked, resetChecklist } = useIngredientChecklist(recipeId);
   
   // Load checked ingredients from localStorage when component mounts
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const savedItems = localStorage.getItem(storageKey);
+        const savedItems = localStorage.getItem(recipeId);
         if (savedItems) {
           setCheckedIngredients(new Set(JSON.parse(savedItems)));
         }
@@ -94,21 +102,21 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
         console.error('Error loading saved grocery list:', error);
       }
     }
-  }, [storageKey]);
+  }, [recipeId]);
   
   // Save checked ingredients to localStorage whenever they change
   useEffect(() => {
     if (typeof window !== 'undefined' && checkedIngredients.size > 0) {
       try {
         localStorage.setItem(
-          storageKey, 
+          recipeId, 
           JSON.stringify(Array.from(checkedIngredients))
         );
       } catch (error) {
         console.error('Error saving grocery list:', error);
       }
     }
-  }, [checkedIngredients, storageKey]);
+  }, [checkedIngredients, recipeId]);
   
   // Handle ingredient checkbox changes
   const handleIngredientCheck = (ingredient: string, checked: boolean) => {
@@ -360,6 +368,68 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
     checkSavedStatus();
   }, [user, recipe]);
   
+  // Add this useEffect to listen for changes to localStorage
+  useEffect(() => {
+    // Function to check if recipe is in grocery list
+    const checkIfRecipeInList = () => {
+      try {
+        const storedRecipes = localStorage.getItem('recipes');
+        if (storedRecipes) {
+          const recipes = JSON.parse(storedRecipes);
+          const recipeName = typeof recipe === 'string' 
+            ? ((recipe as string).match(/# (.+)$/m)?.[1] || 'Recipe')
+            : (recipe as any).title || 'Recipe';
+          
+          // Update state based on whether the recipe exists in list
+          const recipeExists = recipes.some((r: any) => r.name === recipeName);
+          setRecipeAddedToList(recipeExists);
+        } else {
+          // If no recipes in storage, button should not be green
+          setRecipeAddedToList(false);
+        }
+      } catch (error) {
+        console.error('Error checking grocery list:', error);
+        setRecipeAddedToList(false);
+      }
+    };
+
+    // Check initially
+    checkIfRecipeInList();
+    
+    // Set up event listener for storage changes
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'recipes' || e.key?.startsWith('temp-grocery-update-')) {
+        checkIfRecipeInList();
+      }
+    };
+    
+    // Set up event listener for our custom event
+    const handleGroceryListUpdate = () => {
+      checkIfRecipeInList();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('groceryListUpdated', handleGroceryListUpdate);
+    
+    // Clean up event listeners
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('groceryListUpdated', handleGroceryListUpdate);
+    };
+  }, [recipe]);
+  
+  // Function to open grocery list with the current recipe's ingredients
+  const handleOpenGroceryList = () => {
+    const ingredients = extractIngredients();
+    const recipeName = typeof recipe === 'string' 
+      ? ((recipe as string).match(/# (.+)$/m)?.[1] || 'Recipe')
+      : (recipe as any).title || 'Recipe';
+    
+    // Use addRecipeToGroceryList to pass the current recipe ingredients
+    addRecipeToGroceryList(ingredients, recipeName);
+    setRecipeAddedToList(true);
+  };
+  
   // If we have markdown content, render it
   if (typeof recipe === 'string') {
     // Extract metadata from markdown if possible
@@ -369,7 +439,254 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
     const servingsMatch = contentToRender.match(/Servings:\s*(.+?)(?:\n|$)/i);
     
     // Format markdown for display
+    const formatMarkdown = (markdown: string) => {
+      // Extract the title first
+      const titleMatch = markdown.match(/^# (.*$)/m);
+      let title = titleMatch ? titleMatch[1] : 'Recipe';
+      
+      // Start with the title
+      let formattedContent = `<h1 class="text-3xl font-bold text-white mb-6 text-center">${title}</h1>`;
+      
+      // Add cooking time and servings directly under the title
+      if (prepTimeMatch || cookTimeMatch || totalTimeMatch || servingsMatch) {
+        formattedContent += '<div class="mb-8"><ul class="space-y-3 mb-4">';
+        
+        if (prepTimeMatch) {
+          formattedContent += `<li class="py-1 mb-1 text-center">Prep Time: ${prepTimeMatch[1]}</li>`;
+        }
+        
+        if (cookTimeMatch) {
+          formattedContent += `<li class="py-1 mb-1 text-center">Cook Time: ${cookTimeMatch[1]}</li>`;
+        }
+        
+        if (totalTimeMatch) {
+          formattedContent += `<li class="py-1 mb-1 text-center">Total Time: ${totalTimeMatch[1]}</li>`;
+        }
+        
+        if (servingsMatch) {
+          formattedContent += `<li class="py-1 mb-1 text-center">Servings: ${servingsMatch[1]}</li>`;
+        }
+        
+        formattedContent += '</ul><div class="border-t border-gray-700 mt-6"></div></div>';
+      }
+      
+      // Remove the title from the markdown to avoid duplicating it
+      let contentWithoutTitle = markdown.replace(/^# .*$\n*/m, '');
+
+      // Split the content by section headers
+      const sections = contentWithoutTitle.split(/^## /m);
+      
+      // Process each section
+      for (let i = 0; i < sections.length; i++) {
+        const section = sections[i];
+        if (!section.trim()) continue;
+        
+        // Get the section title and content
+        const sectionParts = section.split(/\n/, 2);
+        const sectionTitle = sectionParts[0].trim();
+        let sectionContent = sectionParts.length > 1 ? section.substring(sectionParts[0].length + 1) : '';
+        
+        // Add section header - use negative margin for the first section to pull it closer to the line
+        let headerClass = "text-2xl font-bold text-blue-400 mb-4 text-center";
+        if (i === 0 && sectionTitle.toLowerCase() === 'ingredients') {
+          headerClass = "text-2xl font-bold text-blue-400 mb-4 text-center -mt-4";
+        }
+        formattedContent += `<h2 class="${headerClass}">${sectionTitle}</h2>`;
+        
+        // Special handling for Ingredients section
+        if (sectionTitle.toLowerCase() === 'ingredients') {
+          // Remove decorative divider
+          
+          // Add checkbox helper text
+          formattedContent += `<p class="text-sm text-gray-400 italic text-center mb-4">Check off ingredients as you go. Your progress will be saved.</p>`;
+          formattedContent += processIngredientsSection(sectionContent, recipeId, isIngredientChecked);
+        } 
+        // Special handling for Instructions section
+        else if (sectionTitle.toLowerCase() === 'instructions') {
+          // Remove decorative divider
+          
+          // Add checkbox helper text for instructions
+          formattedContent += `<p class="text-sm text-gray-400 italic text-center mb-4">Check off steps as you complete them.</p>`;
+          formattedContent += processInstructionsSection(sectionContent);
+        } 
+        // Handle other sections
+        else {
+          formattedContent += processGenericSection(sectionContent);
+        }
+      }
+      
+      return formattedContent;
+    };
+    
+    // Helper function to process the ingredients section
+    const processIngredientsSection = (content: string, recipeId: string, isIngredientChecked: (ingredient: string) => boolean) => {
+      let result = '<div class="mb-8 pl-1">';
+      const lines = content.split('\n');
+      let currentCategory = '';
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        // Check for category headers like "MEAT SAUCE:" or "For the sauce:" or "LASAGNA:"
+        const categoryMatch = line.match(/^(?:###\s*)?([A-Z][A-Z\s]+:)|^(?:###\s*)?(For the [^:]+:)|^(?:###\s*)?([A-Z][A-Za-z]+:)/);
+        if (categoryMatch) {
+          // Get the matched category (whichever group matched)
+          currentCategory = categoryMatch[1] || categoryMatch[2] || categoryMatch[3] || '';
+          // Clean up the category name
+          currentCategory = currentCategory.replace(/^For the\s+/i, '');
+          result += `<h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2 mt-6">${currentCategory}</h3>`;
+          continue;
+        }
+        
+        // Check for ingredient lines
+        if (line.startsWith('- ')) {
+          const ingredient = line.substring(2).trim();
+          const ingredientId = `${recipeId}-${ingredient.replace(/\s+/g, '-').toLowerCase()}`;
+          
+          result += `
+            <div class="flex items-start gap-4 mb-3 py-1 pl-2" data-ingredient="${ingredient}">
+              <input 
+                type="checkbox" 
+                id="${ingredientId}" 
+                class="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 ingredient-checkbox flex-shrink-0"
+                ${isIngredientChecked(ingredient) ? 'checked' : ''}
+              />
+              <label 
+                for="${ingredientId}" 
+                class="text-lg cursor-pointer ${isIngredientChecked(ingredient) ? 'line-through text-gray-500' : 'text-gray-300'}"
+              >
+                ${ingredient}
+              </label>
+            </div>
+          `;
+        }
+      }
+      
+      result += '</div>';
+      return result;
+    };
+    
+    // Helper function to process the instructions section
+    const processInstructionsSection = (content: string) => {
+      let result = '<div class="space-y-6 mb-8">';
+      const lines = content.split('\n');
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        // Check for numbered list items
+        const instructionMatch = line.match(/^\d+\.\s*(.+)$/);
+        if (instructionMatch) {
+          const instruction = instructionMatch[1];
+          const instructionId = `${recipeId}-instruction-${i}`;
+          
+          result += `
+            <div class="flex items-start gap-4 pl-2 pb-3 pr-2">
+              <input 
+                type="checkbox" 
+                id="${instructionId}" 
+                class="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 instruction-checkbox flex-shrink-0"
+                ${isIngredientChecked(`instruction-${i}`) ? 'checked' : ''}
+              />
+              <label for="${instructionId}" class="flex-grow cursor-pointer">
+                ${instruction}
+              </label>
+            </div>
+          `;
+        }
+      }
+      
+      result += '</div>';
+      return result;
+    };
+    
+    // Helper function to process generic sections
+    const processGenericSection = (content: string) => {
+      let result = '<div class="mb-8 px-2">';
+      const lines = content.split('\n');
+      let inList = false;
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        if (!line) {
+          if (inList) {
+            result += '</ul>';
+            inList = false;
+          }
+          continue;
+        }
+        
+        // Check for list items
+        if (line.startsWith('- ')) {
+          if (!inList) {
+            result += '<ul class="space-y-3 mb-4 pl-4">';
+            inList = true;
+          }
+          result += `<li class="py-1 mb-1">${line.substring(2).trim()}</li>`;
+        } else {
+          if (inList) {
+            result += '</ul>';
+            inList = false;
+          }
+          
+          // Regular paragraph
+          result += `<p class="text-gray-300 mb-3">${line}</p>`;
+        }
+      }
+      
+      if (inList) {
+        result += '</ul>';
+      }
+      
+      result += '</div>';
+      return result;
+    };
+
     const formattedMarkdown = formatMarkdown(contentToRender);
+    
+    // Add event listener for ingredient checkboxes after the content is rendered
+    useEffect(() => {
+      const checkboxes = document.querySelectorAll('.ingredient-checkbox, .instruction-checkbox');
+      
+      const handleCheckboxChange = (e: Event) => {
+        const checkbox = e.target as HTMLInputElement;
+        
+        if (checkbox.classList.contains('ingredient-checkbox')) {
+          const ingredientDiv = checkbox.closest('[data-ingredient]');
+          if (ingredientDiv) {
+            const ingredient = ingredientDiv.getAttribute('data-ingredient') || '';
+            toggleIngredient(ingredient);
+            
+            // Update the label styling
+            const label = ingredientDiv.querySelector('label');
+            if (label) {
+              if (checkbox.checked) {
+                label.classList.add('line-through', 'text-gray-500');
+                label.classList.remove('text-gray-300');
+              } else {
+                label.classList.remove('line-through', 'text-gray-500');
+                label.classList.add('text-gray-300');
+              }
+            }
+          }
+        } else if (checkbox.classList.contains('instruction-checkbox')) {
+          // Get the instruction step number from the ID
+          const instructionId = checkbox.id;
+          const instructionKey = instructionId.split('-').slice(-2).join('-'); // Get "instruction-X" part
+          toggleIngredient(instructionKey);
+        }
+      };
+      
+      checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', handleCheckboxChange);
+      });
+      
+      return () => {
+        checkboxes.forEach(checkbox => {
+          checkbox.removeEventListener('change', handleCheckboxChange);
+        });
+      };
+    }, [toggleIngredient]);
     
     const handleSaveRecipe = async () => {
       if (!user) {
@@ -421,7 +738,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
     const ingredientsBySection = organizeBySection(allIngredients);
     
     return (
-      <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+      <div className="recipe-display bg-gray-800 rounded-xl overflow-hidden shadow-xl max-w-4xl mx-auto">
         {recipeImage && (
           <div className="relative w-full h-48 mb-4 rounded-lg overflow-hidden">
             <Image
@@ -453,128 +770,61 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
           </button>
           
           <button
-            onClick={() => setShowShoppingList(true)}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+            onClick={handleOpenGroceryList}
+            className={`flex items-center gap-2 ${
+              recipeAddedToList 
+                ? 'bg-green-600 hover:bg-green-700' 
+                : 'bg-gray-600 hover:bg-gray-500'
+            } text-white px-4 py-2 rounded-lg transition-colors`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            Grocery List
+            {recipeAddedToList ? 'Added to List' : 'Add to Grocery List'}
+          </button>
+          
+          <button
+            onClick={resetChecklist}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Reset Checkboxes
           </button>
         </div>
         
-        {/* Recipe Content */}
-        <div className="mt-6 recipe-content" dangerouslySetInnerHTML={{ __html: formattedMarkdown }} />
+        {/* Recipe Content with proper padding */}
+        <div className="px-6 md:px-8 pb-6 mt-4">
+          <div className="recipe-content" dangerouslySetInnerHTML={{ __html: formattedMarkdown }} />
+        </div>
         
         {url && (
-  <div className="mt-4 pt-4 border-t border-gray-700 flex flex-col items-center">        {/* End message */}
-
-     <a 
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-400 hover:text-blue-300 text-sm inline-flex items-center gap-2"
-    >
-      View Original Recipe
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-      </svg>
-    </a>
-  </div>
-)}
+          <div className="mt-4 pt-4 border-t border-gray-700 flex flex-col items-center px-6 pb-6">
+            {/* End message */}
+            <a 
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 text-sm inline-flex items-center gap-2"
+            >
+              View Original Recipe
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+        )}
         
         {/* Shopping List Modal */}
         {showShoppingList && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-800 rounded-xl w-full max-w-xl max-h-[95vh] overflow-auto">
-              <div className="p-5 border-b border-gray-700 flex justify-between items-center">
-                <h3 className="text-2xl font-bold">Grocery List</h3>
-                <button 
-                  onClick={() => setShowShoppingList(false)}
-                  className="text-gray-400 hover:text-white p-2"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              {/* Tabs - Made larger for better mobile usability */}
-              <div className="flex border-b border-gray-700">
-                <button
-                  className={`flex-1 py-4 text-center text-xl font-medium ${
-                    groceryListMode === 'all' 
-                      ? 'text-blue-400 border-b-2 border-blue-400' 
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => setGroceryListMode('all')}
-                >
-                  All Items
-                </button>
-                <button
-                  className={`flex-1 py-4 text-center text-xl font-medium ${
-                    groceryListMode === 'sections' 
-                      ? 'text-blue-400 border-b-2 border-blue-400' 
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                  onClick={() => setGroceryListMode('sections')}
-                >
-                  By Section
-                </button>
-              </div>
-              
-              <div className="p-5">
-                {groceryListMode === 'all' ? (
-                  <ul className="space-y-4">
-                    {allIngredients.map((ingredient: string, index: number) => (
-                      <li key={index} className="flex items-start gap-4">
-                        <input 
-                          type="checkbox" 
-                          id={`ingredient-${index}`}
-                          className="mt-1 h-6 w-6 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                          checked={checkedIngredients.has(ingredient)}
-                          onChange={(e) => handleIngredientCheck(ingredient, e.target.checked)}
-                        />
-                        <label 
-                          htmlFor={`ingredient-${index}`}
-                          className="text-gray-300 text-xl"
-                        >
-                          {ingredient}
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="space-y-8">
-                    {Object.entries(ingredientsBySection).map(([section, items]) => (
-                      <div key={section}>
-                        <h4 className="text-xl font-medium text-blue-400 mb-3">{section}</h4>
-                        <ul className="space-y-4 pl-2">
-                          {items.map((ingredient, index) => (
-                            <li key={index} className="flex items-start gap-4">
-                              <input 
-                                type="checkbox" 
-                                id={`section-${section}-ingredient-${index}`}
-                                className="mt-1 h-6 w-6 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                                checked={checkedIngredients.has(ingredient)}
-                                onChange={(e) => handleIngredientCheck(ingredient, e.target.checked)}
-                              />
-                              <label 
-                                htmlFor={`section-${section}-ingredient-${index}`}
-                                className="text-gray-300 text-xl"
-                              >
-                                {ingredient}
-                              </label>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <GroceryList 
+            ingredients={extractIngredients()} 
+            recipeName={typeof recipe === 'string' 
+              ? ((recipe as string).match(/# (.+)$/m)?.[1] || 'Recipe')
+              : (recipe as any).title || 'Recipe'} 
+            onClose={() => setShowShoppingList(false)} 
+          />
         )}
         
         {/* Login Prompt Modal */}
@@ -593,7 +843,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
   
   // If we have a structured recipe object, render it
   return (
-    <div className="bg-gray-900 rounded-xl p-4 shadow-lg">
+    <div className="recipe-display bg-gray-800 rounded-xl overflow-hidden shadow-xl max-w-4xl mx-auto">
       {recipeImage && (
         <div className="relative w-full h-48 mb-4 rounded-lg overflow-hidden">
           <Image
@@ -660,475 +910,244 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
         </button>
         
         <button
-          onClick={() => setShowShoppingList(true)}
-          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+          onClick={handleOpenGroceryList}
+          className={`flex items-center gap-2 ${
+            recipeAddedToList 
+              ? 'bg-green-600 hover:bg-green-700' 
+              : 'bg-gray-600 hover:bg-gray-500'
+          } text-white px-4 py-2 rounded-lg transition-colors`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
-          Grocery List
+          {recipeAddedToList ? 'Added to List' : 'Add to Grocery List'}
+        </button>
+        
+        <button
+          onClick={resetChecklist}
+          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Reset Checkboxes
         </button>
       </div>
       
-      <div className="mt-6 prose prose-invert max-w-none">
-        {/* Title */}
-        <h1 className="text-3xl font-bold text-white mb-6 text-center">{recipe.title}</h1>
-        
-        {/* Ingredients */}
-        <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Ingredients</h2>
-        {recipe.ingredientCategories ? (
-          <div className="mb-10">
-            {Object.entries(recipe.ingredientCategories as Record<string, string[]>).map(([category, ingredients], index) => (
-              <div key={index} className="mb-10">
-                <h3 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{category.replace(/^For the\s+/i, '')}</h3>
-                <ul className="space-y-3 pl-2 mt-4">
-                  {ingredients.map((ingredient: string, idx: number) => (
-                    <li key={idx} className="py-1 mb-1">{ingredient}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        ) : (
-          // Render flat ingredient list
-          <ul className="space-y-3 mb-8">
-            {recipe.ingredients.map((ingredient: string, index: number) => (
-              <li key={index} className="py-1 mb-1">{ingredient}</li>
+      {/* Content with proper padding */}
+      <div className="px-6 md:px-8 pb-6 mt-4">
+        <div className="mt-4 prose prose-invert max-w-none">
+          {/* Title */}
+          <h1 className="text-3xl font-bold text-white mb-6 text-center">{recipe.title}</h1>
+          
+          {/* Cooking Time and Servings - MOVED DIRECTLY UNDER TITLE */}
+          {recipe.cookingInfo && (
+            <div className="mb-0">
+              <ul className="space-y-3 mb-4">
+                {recipe.cookingInfo.map((item: string, index: number) => (
+                  <li key={index} className="py-1 mb-1 text-center">{item}</li>
+                ))}
+              </ul>
+              <div className="border-t border-gray-700 pt-4 mt-6 mb-0"></div>
+            </div>
+          )}
+          
+          {/* Ingredients with checkboxes - use negative margin to reduce space */}
+          <h2 className="text-2xl font-bold text-blue-400 mb-4 text-center -mt-4">Ingredients</h2>
+          
+          {/* Remove decorative divider */}
+          
+          <p className="text-sm text-gray-400 italic text-center mb-4">Check off ingredients as you go. Your progress will be saved.</p>
+          {recipe.ingredientCategories ? (
+            <div className="mb-10">
+              {Object.entries(recipe.ingredientCategories as Record<string, string[]>).map(([category, ingredients], index) => (
+                <div key={index} className="mb-10">
+                  <h3 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{category.replace(/^For the\s+/i, '')}</h3>
+                  <ul className="space-y-3 pl-2 mt-4">
+                    {ingredients.map((ingredient: string, idx: number) => (
+                      <li key={idx} className="py-1 mb-1 flex items-start gap-4 pl-2">
+                        <input
+                          type="checkbox"
+                          id={`${recipeId}-${category}-${idx}`}
+                          checked={isIngredientChecked(ingredient)}
+                          onChange={() => toggleIngredient(ingredient)}
+                          className="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                        />
+                        <label 
+                          htmlFor={`${recipeId}-${category}-${idx}`}
+                          className={`cursor-pointer ${isIngredientChecked(ingredient) ? 'line-through text-gray-500' : ''}`}
+                        >
+                          {ingredient}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Render flat ingredient list with checkboxes
+            <ul className="space-y-3 mb-8 pl-2">
+              {recipe.ingredients.map((ingredient: string, index: number) => (
+                <li key={index} className="py-1 mb-1 flex items-start gap-4 pl-2">
+                  <input
+                    type="checkbox"
+                    id={`${recipeId}-ingredient-${index}`}
+                    checked={isIngredientChecked(ingredient)}
+                    onChange={() => toggleIngredient(ingredient)}
+                    className="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                  />
+                  <label 
+                    htmlFor={`${recipeId}-ingredient-${index}`}
+                    className={`cursor-pointer ${isIngredientChecked(ingredient) ? 'line-through text-gray-500' : ''}`}
+                  >
+                    {ingredient}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          
+          {/* Divider between sections */}
+          <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
+          
+          {/* Instructions with checkboxes */}
+          <h2 className="text-2xl font-bold text-blue-400 mb-4 text-center">Instructions</h2>
+          
+          {/* Remove decorative divider */}
+          
+          <p className="text-sm text-gray-400 italic text-center mb-4">Check off steps as you complete them.</p>
+          <ul className="space-y-6 mb-10 pl-2">
+            {recipe.instructions.map((instruction: string, index: number) => (
+              <li key={index} className="py-1 mb-3 flex items-start gap-4">
+                <input 
+                  type="checkbox" 
+                  id={`${recipeId}-instruction-${index}`}
+                  checked={isIngredientChecked(`instruction-${index}`)}
+                  onChange={() => toggleIngredient(`instruction-${index}`)}
+                  className="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                />
+                <label 
+                  htmlFor={`${recipeId}-instruction-${index}`}
+                  className="flex-grow cursor-pointer"
+                >
+                  {instruction}
+                </label>
+              </li>
             ))}
           </ul>
+          
+          {/* Divider before Notes section */}
+          <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
+          
+          {/* Notes */}
+          {recipe.notes && (
+            <>
+              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Notes</h2>
+              <div className="text-gray-300 mb-3">
+                {Array.isArray(recipe.notes) ? (
+                  <ul className="space-y-3">
+                    {recipe.notes.map((note: string, index: number) => (
+                      <li key={index} className="py-1 mb-1">{note}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{recipe.notes}</p>
+                )}
+              </div>
+            </>
+          )}
+          
+          {/* Other optional sections */}
+          
+          {recipe.nutrition && (
+            <>
+              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
+              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Nutritional Information</h2>
+              <ul className="space-y-3 mb-8">
+                {recipe.nutrition.map((item: string, index: number) => (
+                  <li key={index} className="py-1 mb-1">{item}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          
+          {recipe.storage && (
+            <>
+              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
+              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Storage Instructions</h2>
+              <ul className="space-y-3 mb-8">
+                {recipe.storage.map((item: string, index: number) => (
+                  <li key={index} className="py-1 mb-1">{item}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          
+          {recipe.reheating && (
+            <>
+              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
+              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Reheating Instructions</h2>
+              <ul className="space-y-3 mb-8">
+                {recipe.reheating.map((item: string, index: number) => (
+                  <li key={index} className="py-1 mb-1">{item}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          
+          {recipe.makeAhead && (
+            <>
+              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
+              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Make Ahead Tips</h2>
+              <ul className="space-y-3 mb-8">
+                {recipe.makeAhead.map((item: string, index: number) => (
+                  <li key={index} className="py-1 mb-1">{item}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          
+          {recipe.dietaryInfo && (
+            <>
+              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
+              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Dietary Information</h2>
+              <ul className="space-y-3 mb-8">
+                {recipe.dietaryInfo.map((item: string, index: number) => (
+                  <li key={index} className="py-1 mb-1">{item}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+        
+        {url && (
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <a 
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 text-sm"
+            >
+              View Original Recipe
+            </a>
+          </div>
         )}
         
-        {/* Divider between sections */}
-        <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-        
-        {/* Instructions */}
-        <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Instructions</h2>
-        <ol className="list-decimal pl-5 space-y-6 mb-8">
-          {recipe.instructions.map((instruction: string, index: number) => (
-            <li key={index} className="pl-2 pb-3">{instruction}</li>
-          ))}
-        </ol>
-        
-        {/* Divider before Notes section */}
-        <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-        
-        {/* Notes */}
-        {recipe.notes && (
-          <>
-            <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Notes</h2>
-            <div className="text-gray-300 mb-3">
-              {Array.isArray(recipe.notes) ? (
-                <ul className="space-y-3">
-                  {recipe.notes.map((note: string, index: number) => (
-                    <li key={index} className="py-1 mb-1">{note}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>{recipe.notes}</p>
-              )}
-            </div>
-          </>
-        )}
-        
-        {/* Optional Sections - only show if they exist */}
-        {recipe.cookingInfo && (
-          <>
-            <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-            <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Cooking Time and Servings</h2>
-            <ul className="space-y-3 mb-8">
-              {recipe.cookingInfo.map((item: string, index: number) => (
-                <li key={index} className="py-1 mb-1">{item}</li>
-              ))}
-            </ul>
-          </>
-        )}
-        
-        {recipe.nutrition && (
-          <>
-            <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-            <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Nutritional Information</h2>
-            <ul className="space-y-3 mb-8">
-              {recipe.nutrition.map((item: string, index: number) => (
-                <li key={index} className="py-1 mb-1">{item}</li>
-              ))}
-            </ul>
-          </>
-        )}
-        
-        {recipe.storage && (
-          <>
-            <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-            <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Storage Instructions</h2>
-            <ul className="space-y-3 mb-8">
-              {recipe.storage.map((item: string, index: number) => (
-                <li key={index} className="py-1 mb-1">{item}</li>
-              ))}
-            </ul>
-          </>
-        )}
-        
-        {recipe.reheating && (
-          <>
-            <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-            <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Reheating Instructions</h2>
-            <ul className="space-y-3 mb-8">
-              {recipe.reheating.map((item: string, index: number) => (
-                <li key={index} className="py-1 mb-1">{item}</li>
-              ))}
-            </ul>
-          </>
-        )}
-        
-        {recipe.makeAhead && (
-          <>
-            <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-            <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Make Ahead Tips</h2>
-            <ul className="space-y-3 mb-8">
-              {recipe.makeAhead.map((item: string, index: number) => (
-                <li key={index} className="py-1 mb-1">{item}</li>
-              ))}
-            </ul>
-          </>
-        )}
-        
-        {recipe.dietaryInfo && (
-          <>
-            <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-            <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Dietary Information</h2>
-            <ul className="space-y-3 mb-8">
-              {recipe.dietaryInfo.map((item: string, index: number) => (
-                <li key={index} className="py-1 mb-1">{item}</li>
-              ))}
-            </ul>
-          </>
+        {/* Shopping List Modal */}
+        {showShoppingList && (
+          <GroceryList 
+            ingredients={extractIngredients()} 
+            recipeName={typeof recipe === 'string' 
+              ? ((recipe as string).match(/# (.+)$/m)?.[1] || 'Recipe')
+              : (recipe as any).title || 'Recipe'} 
+            onClose={() => setShowShoppingList(false)} 
+          />
         )}
       </div>
-      
-      {url && (
-        <div className="mt-4 pt-4 border-t border-gray-700">
-          <a 
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 text-sm"
-          >
-            View Original Recipe
-          </a>
-        </div>
-      )}
-      
-      {/* Shopping List Modal */}
-      {showShoppingList && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-xl w-full max-w-xl max-h-[95vh] overflow-auto">
-            <div className="p-5 border-b border-gray-700 flex justify-between items-center">
-              <h3 className="text-2xl font-bold">Grocery List</h3>
-              <button 
-                onClick={() => setShowShoppingList(false)}
-                className="text-gray-400 hover:text-white p-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            {/* Tabs - Made larger for better mobile usability */}
-            <div className="flex border-b border-gray-700">
-              <button
-                className={`flex-1 py-4 text-center text-xl font-medium ${
-                  groceryListMode === 'all' 
-                    ? 'text-blue-400 border-b-2 border-blue-400' 
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => setGroceryListMode('all')}
-              >
-                All Items
-              </button>
-              <button
-                className={`flex-1 py-4 text-center text-xl font-medium ${
-                  groceryListMode === 'sections' 
-                    ? 'text-blue-400 border-b-2 border-blue-400' 
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                onClick={() => setGroceryListMode('sections')}
-              >
-                By Section
-              </button>
-            </div>
-            
-            <div className="p-5">
-              {groceryListMode === 'all' ? (
-                <ul className="space-y-4">
-                  {extractIngredients().map((ingredient: string, index: number) => (
-                    <li key={index} className="flex items-start gap-4">
-                      <input 
-                        type="checkbox" 
-                        id={`ingredient-${index}`}
-                        className="mt-1 h-6 w-6 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                        checked={checkedIngredients.has(ingredient)}
-                        onChange={(e) => handleIngredientCheck(ingredient, e.target.checked)}
-                      />
-                      <label 
-                        htmlFor={`ingredient-${index}`}
-                        className="text-gray-300 text-xl"
-                      >
-                        {ingredient}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="space-y-8">
-                  {Object.entries(organizeBySection(extractIngredients())).map(([section, items]: [string, string[]], idx: number) => (
-                    <div key={`${section}-${idx}`}>
-                      <h4 className="text-xl font-medium text-blue-400 mb-3">{section}</h4>
-                      <ul className="space-y-4 pl-2">
-                        {items.map((ingredient: string, index: number) => (
-                          <li key={index} className="flex items-start gap-4">
-                            <input 
-                              type="checkbox" 
-                              id={`section-${section}-ingredient-${index}`}
-                              className="mt-1 h-6 w-6 rounded border-gray-600 text-blue-600 focus:ring-blue-500"
-                              checked={checkedIngredients.has(ingredient)}
-                              onChange={(e) => handleIngredientCheck(ingredient, e.target.checked)}
-                            />
-                            <label 
-                              htmlFor={`section-${section}-ingredient-${index}`}
-                              className="text-gray-300 text-xl"
-                            >
-                              {ingredient}
-                            </label>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-// Update the formatMarkdown function to add a line under the last ingredient
-
-function formatMarkdown(text: string) {
-  // First, skip common metadata lines that we're already displaying at the top
-  const cleanedText = text
-    .replace(/^Prep Time:\s*(.+?)$/gm, '')
-    .replace(/^Cook Time:\s*(.+?)$/gm, '')
-    .replace(/^Total Time:\s*(.+?)$/gm, '')
-    .replace(/^Servings:\s*(.+?)$/gm, '')
-    .replace(/^Yield:\s*(.+?)$/gm, '')
-    .replace(/^Difficulty:\s*(.+?)$/gm, '')
-    .replace(/\n\n\n+/g, '\n\n'); // Clean up excess empty lines
-  
-  // Pre-process the content to mark ingredient categories
-  let processedText = cleanedText;
-  
-  // First, look for patterns like "For the Meat Sauce:" and convert them to a standardized format
-  processedText = processedText.replace(
-    /^(For the [^:\n]+:|[A-Z][A-Z\s]+:|[A-Za-z\s]+ Filling:|[A-Za-z\s]+ Sauce:|[A-Za-z\s]+ Mixture:)$/gm,
-    '### $1'
-  );
-  
-  // Now split the text into sections based on headers
-  const sections = processedText.split(/^#+ /m);
-  
-  let html = '';
-  
-  // Process each section
-  sections.forEach((section, index) => {
-    if (index === 0 && !section.trim()) return; // Skip empty first section
-    
-    const lines = section.split('\n');
-    const title = lines[0].trim();
-    const content = lines.slice(1).join('\n').trim();
-    
-    // Skip sections that are just metadata which we already display at the top
-    if (/^(prep time|cook time|total time|cooking time|servings|yield|difficulty|serves)/i.test(title)) {
-      return;
-    }
-    
-    // Determine header level based on the original markdown
-    const headerMatch = processedText.match(new RegExp(`^(#+) ${title}`, 'm'));
-    const headerLevel = headerMatch ? headerMatch[1].length : 1;
-    
-    // Add section header with more spacing and border for Notes section and other main sections
-    const isNotesSection = title === 'Notes';
-    const isIngredientsSection = title.toLowerCase().includes('ingredient');
-    const isInstructionsSection = title.toLowerCase().includes('instruction');
-    
-    // Add divider for all main sections except the first one (title) 
-    const needsDivider = headerLevel === 2 && index > 1;
-    
-    html += `<div class="recipe-section mb-14 ${needsDivider ? 'border-t border-gray-700 pt-8 mt-8' : ''}">`;
-      
-    // Make the main title much larger and centered
-    if (headerLevel === 1) {
-      html += `<h1 class="text-3xl font-bold text-white mb-6 text-center">${title}</h1>`;
-    } else {
-      // Center the section headers (Ingredients, Instructions, etc.)
-      html += `<h2 class="text-2xl font-bold text-blue-400 mb-5 text-center">${title}</h2>`;
-    }
-    
-    // Process content based on type
-    if (content.includes('- ')) {
-      // This is likely an ingredients list
-      html += `<ul class="space-y-4">`;
-      
-      // Check for ### subsection headers in ingredients section (categories)
-      if (isIngredientsSection && content.includes('### ')) {
-        // Split by category headers
-        const categories = content.split(/(?=### )/);
-        
-        // Process each category
-        categories.forEach((category, catIdx) => {
-          const trimmedCategory = category.trim();
-          if (!trimmedCategory) return;
-          
-          // Check if this is a category header
-          const categoryMatch = trimmedCategory.match(/### (.*?):\s*([\s\S]*)/);
-          
-          if (categoryMatch) {
-            // This is a category
-            const categoryName = categoryMatch[1].trim();
-            const categoryContent = categoryMatch[2].trim();
-            
-            // Add category header with distinctive styling
-            html += `
-              <li class="mt-10 mb-6">
-                <h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">${categoryName.replace(/^For the\s+/i, '')}:</h3>
-                <ul class="space-y-3 pl-2 mt-4">
-            `;
-            
-            // Add individual ingredients in this category WITHOUT borders
-            const categoryItems = categoryContent.split('\n');
-            categoryItems.forEach(item => {
-              const trimmedItem = item.trim();
-              if (trimmedItem.startsWith('- ')) {
-                const ingredient = trimmedItem.substring(2).trim();
-                html += `<li class="py-1 mb-1">${ingredient}</li>`;
-              }
-            });
-            
-            html += `</ul></li>`;
-          } else {
-            // These are regular ingredients
-            const itemLines = trimmedCategory.split('\n');
-            itemLines.forEach(line => {
-              const trimmedLine = line.trim();
-              if (trimmedLine.startsWith('- ')) {
-                const ingredient = trimmedLine.substring(2).trim();
-                html += `<li class="py-1 mb-1">${ingredient}</li>`;
-              }
-            });
-          }
-        });
-      } else {
-        // This is a regular ingredient list with no categories
-        const listItems = content.split(/^- /m).filter(Boolean);
-        
-        listItems.forEach((item, idx) => {
-          const trimmedItem = item.trim();
-          
-          if (trimmedItem.endsWith(':')) {
-            // This is a subheading
-            html += `<li class="mt-10 mb-6"><h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">${trimmedItem.replace(/^For the\s+/i, '')}</h3></li>`;
-          } else {
-            // This is a regular ingredient
-            html += `<li class="py-1 mb-1">${trimmedItem}</li>`;
-          }
-        });
-      }
-      
-      html += `</ul>`;
-    } else if (content.match(/^\d+\./m)) {
-      // This is likely an instructions list
-      html += `<ol class="list-decimal pl-5 space-y-6">`;
-      
-      const listItems = content.split(/^\d+\. /m).filter(Boolean);
-      
-      listItems.forEach(item => {
-        html += `<li class="pl-2 pb-3">${item.trim()}</li>`;
-      });
-      
-      html += `</ol>`;
-    } else {
-      // Regular paragraph content
-      const paragraphs = content.split('\n\n');
-      paragraphs.forEach(para => {
-        if (para.trim()) {
-          html += `<p class="text-gray-300 mb-3">${para.trim()}</p>`;
-        }
-      });
-    }
-    
-    html += `</div>`;
-  });
-  
-  // Apply additional formatting
-  html = html
-    // Bold text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    // Italic text
-    .replace(/\*(.*?)\*/g, '<em>$1</em>');
-  
-  // Apply final fixes to the rendered HTML
-  return postProcessHtml(html);
-}
-
-const postProcessHtml = (html: string): string => {
-  // First target the full-width "Ingredients" blue header pattern we see in the screenshot
-  let processedHtml = html;
-  
-  // ULTRA-specific replacement targeting the exact pattern seen in the screenshot
-  processedHtml = processedHtml.replace(
-    /<h2 class="[^"]*">For the Meat Sauce:<\/h2>/gi,
-    `<h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">Meat Sauce:</h3>`
-  );
-  
-  // Target the EXACT pattern from the screenshot with the specific class combination
-  processedHtml = processedHtml.replace(
-    /<h2 class="text-2xl font-bold text-blue-400 mb-5 text-center">For the ([^<:]+):<\/h2>/g,
-    (_: string, categoryName: string) => 
-      `<h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">${categoryName}:</h3>`
-  );
-  
-  // Replace the "For the X Sauce:" pattern with proper teal styling - targeting the specific class pattern from screenshot
-  processedHtml = processedHtml.replace(
-    /<h2 class="[^"]*text-blue-\d+[^"]*">(For the\s+[^<:]+):<\/h2>/gi,
-    (_: string, categoryName: string) => 
-      `<h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">${categoryName.replace(/^For the\s+/i, '')}:</h3>`
-  );
-  
-  // Also catch any other patterns - like the one we had in our original regex
-  processedHtml = processedHtml.replace(
-    /<h2 class="text-lg font-semibold text-blue-600 mt-4">(For the [^:]+:)<\/h2>/g,
-    (_: string, categoryName: string) => 
-      `<h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">${categoryName.replace(/^For the\s+/i, '')}:</h3>`
-  );
-  
-  // Generic catch-all for any blue heading with a colon pattern
-  processedHtml = processedHtml.replace(
-    /<h2 class="[^"]*text-blue-\d+[^"]*">([^<:]+:)<\/h2>/g,
-    (_: string, categoryName: string) => 
-      `<h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">${categoryName}</h3>`
-  );
-  
-  // Also remove border-bottom and pb-1 from any existing h3 headings that might have them
-  processedHtml = processedHtml.replace(
-    /<h3 class="[^"]*border-b[^"]*pb-1[^"]*">/g,
-    '<h3 class="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">'
-  );
-  
-  // Remove border-bottom from individual ingredient items
-  return processedHtml.replace(/<li class="border-b[^"]*">/g, '<li class="">');
-};
 
 // Move the LoginPrompt component outside of the main component
 // and update it to accept props

@@ -47,9 +47,11 @@ export default function RecipeUrlInput({ url, setUrl, onExtract, loading, error,
         <button
           type="submit"
           disabled={loading}
-          className="px-6 py-3 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+          className={`px-4 py-2 text-white rounded transition-colors ${
+            loading ? 'bg-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
-          {loading ? 'Extracting...' : 'Extract Recipe'}
+          {loading ? 'Reading...' : 'Reader'}
         </button>
       </div>
     </form>

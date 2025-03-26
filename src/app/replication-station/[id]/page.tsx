@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { doc, getDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useGroceryList } from '@/lib/contexts/GroceryListContext';
 import RecipeDisplay from '@/components/RecipeDisplay';
 import { DEFAULT_RECIPE_IMAGE, saveRecipe, checkIfRecipeSaved } from '@/lib/firebase/firebaseUtils';
 import GroceryList from '@/components/GroceryList';
@@ -31,6 +32,7 @@ function getRestaurantImage(restaurantName: string): string {
 
 export default function ReplicaRecipePage({ params }: { params: { id: string } }) {
   const { user } = useAuth();
+  const { addRecipeToGroceryList } = useGroceryList();
   const [recipe, setRecipe] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -793,10 +795,12 @@ export default function ReplicaRecipePage({ params }: { params: { id: string } }
       // Categorize the ingredients
       const categorizedIngredients = categorizeIngredients(ingredients);
       
-      // Set the grocery items and show the modal
+      // Set the grocery items
       setGroceryItems(ingredients);
       setCategorizedItems(categorizedIngredients);
-      setShowGroceryModal(true);
+      
+      // Use the context to add recipe to grocery list
+      addRecipeToGroceryList(ingredients, recipe.title);
     } catch (error) {
       console.error('Error generating grocery list:', error);
       alert('Failed to generate grocery list. Please try again.');
@@ -932,14 +936,6 @@ export default function ReplicaRecipePage({ params }: { params: { id: string } }
             </div>
           </div>
         </div>
-        
-        {/* Grocery List Modal - Keep existing implementation */}
-        {showGroceryModal && (
-          <GroceryList 
-            ingredients={groceryItems} 
-            onClose={() => setShowGroceryModal(false)} 
-          />
-        )}
       </div>
     );
   }

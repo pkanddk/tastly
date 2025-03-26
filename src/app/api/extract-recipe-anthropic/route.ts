@@ -92,13 +92,24 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('OpenAI recipe extraction error:', error);
     
+    // Get the URL from the request if possible, otherwise use a placeholder
+    let requestUrl = '#'; // Default placeholder
+    try {
+      if (req.body) {
+        const body = await req.json().catch(() => ({}));
+        if (body.url) requestUrl = body.url;
+      }
+    } catch (e) {
+      console.error('Error extracting URL from request:', e);
+    }
+    
     return NextResponse.json({
       title: "Recipe Extraction Failed",
       ingredients: ["Could not extract ingredients"],
       instructions: ["Please try again later or manually copy the recipe"],
-      markdown: "# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later or manually copy the recipe from the original website.",
+      markdown: `# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later, or [View the original recipe here](${requestUrl}).`,
       method: 'error-fallback',
-      url
+      url: requestUrl
     }, { status: 200 });
   }
 } 

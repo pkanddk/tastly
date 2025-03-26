@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/lib/contexts/AuthContext'
+import { GroceryListProvider } from '@/lib/contexts/GroceryListContext'
 import { Metadata } from 'next'
 import WelcomeBar from '@/components/WelcomeBar'
 import Footer from '@/components/Footer'
@@ -54,11 +55,13 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col relative`}>
         <AuthProvider>
-          <WelcomeBar />
-          <main className="flex-grow pt-16 relative z-0">
-            {children}
-          </main>
-          <Footer />
+          <GroceryListProvider>
+            <WelcomeBar />
+            <main className="flex-grow pt-16 relative z-0">
+              {children}
+            </main>
+            <Footer />
+          </GroceryListProvider>
         </AuthProvider>
         
         {/* Service Worker Registration */}

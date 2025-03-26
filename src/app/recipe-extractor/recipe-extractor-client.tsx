@@ -19,7 +19,7 @@ const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
 export default function RecipeExtractorClient() {
   const [url, setUrl] = useState('');
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
+  const [recipe, setRecipe] = useState<Recipe | string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recipeImage, setRecipeImage] = useState<string | null>(null);
@@ -171,13 +171,8 @@ export default function RecipeExtractorClient() {
       console.error('Extraction error:', err);
       setError(`Failed to extract recipe: ${err instanceof Error ? err.message : 'Please try a different URL'}`);
       
-      // Show a more user-friendly error message
-      setRecipe({
-        title: "Recipe Extraction Failed",
-        ingredients: ["Could not extract ingredients"],
-        instructions: ["Please try again later or manually copy the recipe"],
-        markdown: "# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later or manually copy the recipe from the original website.",
-      });
+      // Show a more user-friendly error message with link to original URL
+      setRecipe(`# Recipe Extraction Failed\n\nWe couldn't extract the recipe automatically. Please try again later, or [View the original recipe here](${url}).`);
     } finally {
       setLoading(false);
     }
@@ -224,10 +219,10 @@ export default function RecipeExtractorClient() {
           />
           <button
             type="submit"
-            className="w-full sm:w-auto sm:whitespace-nowrap bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors"
             disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed w-full md:w-auto"
           >
-            {loading ? 'Extracting...' : 'Extract Recipe'}
+            {loading ? 'Reading...' : 'Reader'}
           </button>
         </div>
       </form>
@@ -236,7 +231,7 @@ export default function RecipeExtractorClient() {
       {recipe && (
         <div className="mt-8">
           <RecipeDisplay 
-            recipe={recipe.markdown || recipe} 
+            recipe={typeof recipe === 'string' ? recipe : recipe.markdown || recipe} 
             recipeImage={recipeImage || DEFAULT_RECIPE_IMAGE}
             url={url}
           />
