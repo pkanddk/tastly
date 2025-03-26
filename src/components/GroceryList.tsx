@@ -168,6 +168,8 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
         isChecked: !updatedCustomItems[customItemIndex].isChecked
       };
       setCustomItems(updatedCustomItems);
+      // Notify other components of the update
+      notifyGroceryListUpdated();
     } else if (recipeId) {
       // Update recipe item
       const updatedRecipes = recipes.map(recipe => {
@@ -184,6 +186,32 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
         return recipe;
       });
       setRecipes(updatedRecipes);
+      // Notify other components of the update
+      notifyGroceryListUpdated();
+    } else {
+      // If no recipeId provided, try to find the item in all recipes
+      const allItems = getAllItems();
+      const item = allItems.find(item => item.id === itemId);
+      
+      if (item && item.recipeId) {
+        // Found the item, update it in the correct recipe
+        const updatedRecipes = recipes.map(recipe => {
+          if (recipe.id === item.recipeId) {
+            return {
+              ...recipe,
+              ingredients: recipe.ingredients.map(ingredient => 
+                ingredient.id === itemId 
+                  ? { ...ingredient, isChecked: !ingredient.isChecked } 
+                  : ingredient
+              )
+            };
+          }
+          return recipe;
+        });
+        setRecipes(updatedRecipes);
+        // Notify other components of the update
+        notifyGroceryListUpdated();
+      }
     }
   };
 
@@ -391,34 +419,65 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
 
   // Remove any grocery item (from custom items or recipe ingredients)
   const removeGroceryItem = (itemId: string, recipeId?: string) => {
-    if (!recipeId) {
-      // Item is from custom items
+    // Check if it's a custom item first
+    const customItemIndex = customItems.findIndex(item => item.id === itemId);
+    
+    if (customItemIndex !== -1) {
+      // Item is a custom item
       removeCustomItem(itemId);
       return;
     }
     
-    // Item is from a recipe's ingredients
-    const updatedRecipes = recipes.map(recipe => {
-      if (recipe.id === recipeId) {
-        const updatedIngredients = recipe.ingredients.filter(item => item.id !== itemId);
-        return {
-          ...recipe,
-          ingredients: updatedIngredients
-        };
-      }
-      return recipe;
-    });
+    // If recipeId is provided, we know which recipe to update
+    if (recipeId) {
+      const updatedRecipes = recipes.map(recipe => {
+        if (recipe.id === recipeId) {
+          const updatedIngredients = recipe.ingredients.filter(item => item.id !== itemId);
+          return {
+            ...recipe,
+            ingredients: updatedIngredients
+          };
+        }
+        return recipe;
+      });
+      
+      // Remove recipes that no longer have any ingredients
+      setRecipes(updatedRecipes.filter(recipe => recipe.ingredients.length > 0));
+      
+      // Notify other components
+      notifyGroceryListUpdated();
+      return;
+    }
     
-    // Remove recipes that no longer have any ingredients
-    setRecipes(updatedRecipes.filter(recipe => recipe.ingredients.length > 0));
+    // If we reach here, we need to find the item in all recipes
+    const allItems = getAllItems();
+    const item = allItems.find(item => item.id === itemId);
     
-    // Notify other components
-    notifyGroceryListUpdated();
+    if (item && item.recipeId) {
+      // Found the item, remove it from the correct recipe
+      const targetRecipeId = item.recipeId;
+      const updatedRecipes = recipes.map(recipe => {
+        if (recipe.id === targetRecipeId) {
+          const updatedIngredients = recipe.ingredients.filter(ingredient => ingredient.id !== itemId);
+          return {
+            ...recipe,
+            ingredients: updatedIngredients
+          };
+        }
+        return recipe;
+      });
+      
+      // Remove recipes that no longer have any ingredients
+      setRecipes(updatedRecipes.filter(recipe => recipe.ingredients.length > 0));
+      
+      // Notify other components
+      notifyGroceryListUpdated();
+    }
   };
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-900 rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center md:p-4 z-50">
+      <div className="bg-gray-900 rounded-xl md:rounded-xl p-4 md:p-6 w-full max-w-3xl md:max-h-[90vh] h-full md:h-auto overflow-y-auto relative">
         {/* Close button */}
           <button 
             onClick={onClose}
@@ -551,7 +610,7 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
                         <input 
                           type="checkbox" 
                           checked={item.isChecked}
-                          onChange={() => toggleItemCheck(item.id)}
+                          onChange={() => toggleItemCheck(item.id, item.recipeId)}
                           className="h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 mr-3"
                         />
                         <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-white'}`}>
@@ -559,7 +618,7 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
                         </span>
                       </div>
                       <button
-                        onClick={() => removeGroceryItem(item.id)}
+                        onClick={() => removeGroceryItem(item.id, item.recipeId)}
                         className="text-red-500 hover:text-red-400"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -576,29 +635,6 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
           // Show recipe-specific view
           recipes.find(r => r.id === activeTab) && (
             <div key={activeTab} className="recipe-list">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-medium text-blue-400">{recipes.find(r => r.id === activeTab)?.name} Ingredients</h3>
-                <button 
-                  onClick={() => removeRecipe(activeTab)}
-                  className="text-red-500 hover:text-red-400 flex items-center gap-1"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  <span>Remove Recipe</span>
-                </button>
-              </div>
-              
-              {/* Action button for removing checked items in this recipe */}
-              <div className="mb-4">
-                <button
-                  onClick={() => removeCheckedItemsFromRecipe(activeTab)}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm w-full"
-                >
-                  Remove Checked Items
-                </button>
-              </div>
-              
               {/* Group ingredients by section */}
               {Object.entries(organizeRecipeItemsBySection(activeTab)).map(([section, items]) => (
                 <div key={section} className="mb-6">
