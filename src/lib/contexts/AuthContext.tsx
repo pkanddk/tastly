@@ -16,7 +16,6 @@ export const AuthContext = createContext<{
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   useEffect(() => {
     // Only log in development environment
@@ -45,13 +44,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Set loading to false once initial check is done
-  useEffect(() => {
-    if (initialCheckDone) {
-      setLoading(false);
-    }
-  }, [initialCheckDone]);
-
   // Handle redirect result
   useEffect(() => {
     async function checkRedirectResult() {
@@ -66,6 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
           console.error("Error getting redirect result:", error);
           localStorage.removeItem('auth_pending');
+        } finally {
+          // Ensure loading is set to false after handling redirect result
+          setLoading(false);
         }
       }
     }

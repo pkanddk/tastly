@@ -32,7 +32,9 @@ export default function MyRecipesPage() {
       }
     }
     
-    loadRecipes();
+    if (!loading) {
+      loadRecipes();
+    }
   }, [user, loading]);
   
   const handleDeleteRecipe = async (recipeId: string, e: React.MouseEvent) => {
