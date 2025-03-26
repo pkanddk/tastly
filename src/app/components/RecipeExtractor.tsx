@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { extractRecipeFromUrl } from '../lib/deepseek';
+import { TAGLINES, END_MESSAGES } from '@/lib/constants';
 
 const RecipeUrlInput = dynamic(() => import('@/components/RecipeUrlInput'), { 
   ssr: false 
@@ -53,6 +54,7 @@ export default function RecipeExtractor() {
   const [recipe, setRecipe] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentTaglineIndex, setCurrentTaglineIndex] = useState(0);
 
   useEffect(() => {
     // Reset URL and recipe when component mounts
@@ -83,6 +85,16 @@ export default function RecipeExtractor() {
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (!loading) return;
+    
+    const interval = setInterval(() => {
+      setCurrentTaglineIndex(current => (current + 1) % TAGLINES.length);
+    }, 3000); // Rotate every 3 seconds
+    
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const handleExtract = async () => {
     if (!url) {
@@ -278,7 +290,12 @@ export default function RecipeExtractor() {
       {loading ? (
         <div className="flex flex-col items-center justify-center p-8">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-300">Extracting recipe...</p>
+          <div className="text-center">
+            <p className="text-gray-300 mb-2">Extracting recipe...</p>
+            <p className="text-blue-400 transition-opacity duration-500">
+              {TAGLINES[currentTaglineIndex].text}
+            </p>
+          </div>
         </div>
       ) : recipe ? (
         formatRecipe(recipe)
