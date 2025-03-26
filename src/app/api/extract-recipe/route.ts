@@ -44,18 +44,40 @@ export async function POST(req: NextRequest) {
 Always include these sections in this exact order:
 
 1. Title with a single # (main heading)
-2. Ingredients section with bullet points
+2. Ingredients section with bullet points - IMPORTANT: Format ALL ingredient categories using ### prefix, like "### Cheese Filling:" or "### Meat Sauce:" (omit phrases like "For the" when possible)
 3. Instructions section with numbered steps
 4. Cooking Time and Servings section
 5. Notes section for tips and variations
+
+Additionally, if present in the original recipe, include these optional sections in this order:
+- Nutritional Information
+- Storage Instructions (including how to store leftovers)
+- Reheating Instructions (if the recipe includes how to reheat leftovers)
+- Make Ahead Tips
+- Dietary Information/Substitutions
 
 Use this exact format:
 
 # [Recipe Name]
 
 ## Ingredients
+
 - [ingredient with amount]
 - [ingredient with amount]
+
+If the original recipe has ingredient categories, ALWAYS format them like this:
+
+## Ingredients
+
+### [Category Name]:
+- [ingredient with amount]
+- [ingredient with amount]
+
+### [Another Category]:
+- [ingredient with amount]
+- [ingredient with amount]
+
+Note: Use concise category names - if category is "For the Meat Sauce", use "### Meat Sauce:"
 
 ## Instructions
 1. [detailed step]
@@ -70,7 +92,15 @@ Use this exact format:
 ## Notes
 - [important tips]
 - [variations]
-- [storage instructions]`
+
+## Storage Instructions
+- [how to store leftovers]
+
+## Reheating Instructions
+- [how to reheat leftovers]
+
+## [Any Other Optional Sections as needed]
+- [relevant information]`
           },
           {
             role: "user",
@@ -86,25 +116,129 @@ Use this exact format:
       
       const content = completion.choices[0].message.content || '';
       
+      // Post-process the content to ensure all ingredient categories use the ### format
+      const processedContent = content.replace(
+        /(## Ingredients[\s\S]*?)(?=##|$)/g,
+        (match) => {
+          // Find lines like "For the Meat Sauce:" or "CHEESE FILLING:" and convert to ### format
+          return match.replace(
+            /^(\s*)(For the [^:\n]+:|[A-Z][A-Z\s]+:|[A-Za-z\s]+ Filling:|[A-Za-z\s]+ Sauce:|[A-Za-z\s]+ Mixture:)/gm,
+            '$1### $2'
+          );
+        }
+      );
+      
       // Parse the markdown content
-      const titleMatch = content.match(/# (.*)/);
+      const titleMatch = processedContent.match(/# (.*)/);
       const title = titleMatch ? titleMatch[1] : url.split('/').pop() || 'Recipe';
       
-      const ingredientsMatch = content.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
-      const ingredients = ingredientsMatch 
-        ? ingredientsMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
-        : [];
+      // Enhanced ingredients parsing to handle categories
+      const ingredientsSection = processedContent.match(/## Ingredients\s*([\s\S]*?)(?=##|$)/);
+      let ingredients: string[] = [];
+      let ingredientCategories: Record<string, string[]> = {};
       
-      const instructionsMatch = content.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
+      if (ingredientsSection) {
+        const ingredientsContent = ingredientsSection[1].trim();
+        
+        // Check if there are categories (subsections starting with ###)
+        const hasCategories = ingredientsContent.includes('### ');
+        
+        if (hasCategories) {
+          // Split content by category headers
+          const categoryBlocks = ingredientsContent.split(/(?=### )/);
+          
+          categoryBlocks.forEach(block => {
+            const trimmedBlock = block.trim();
+            if (!trimmedBlock) return;
+            
+            // Extract category name and ingredients
+            const categoryMatch = trimmedBlock.match(/### (.*?):\s*([\s\S]*)/);
+            if (categoryMatch) {
+              const categoryName = categoryMatch[1].trim();
+              const categoryIngredients = categoryMatch[2]
+                .trim()
+                .split('\n')
+                .map(line => line.replace(/^[*-] /, '').trim())
+                .filter(line => line);
+              
+              ingredientCategories[categoryName] = categoryIngredients;
+              
+              // Also add to flat list
+              ingredients = [...ingredients, ...categoryIngredients];
+            } else {
+              // Handle uncategorized ingredients at the top level
+              const uncategorizedIngredients = trimmedBlock
+                .split('\n')
+                .map(line => line.replace(/^[*-] /, '').trim())
+                .filter(line => line);
+              
+              ingredients = [...ingredients, ...uncategorizedIngredients];
+            }
+          });
+        } else {
+          // No categories, just extract all ingredients as a flat list
+          ingredients = ingredientsContent
+            .split('\n')
+            .map(line => line.replace(/^[*-] /, '').trim())
+            .filter(line => line);
+        }
+      }
+      
+      const instructionsMatch = processedContent.match(/## Instructions\s*([\s\S]*?)(?=##|$)/);
       const instructions = instructionsMatch
         ? instructionsMatch[1].trim().split('\n').map(i => i.replace(/^\d+\.\s*/, '').trim()).filter(i => i)
         : [];
       
+      // Extract additional optional sections
+      const cookingTimeMatch = processedContent.match(/## Cooking Time and Servings\s*([\s\S]*?)(?=##|$)/);
+      const cookingInfo = cookingTimeMatch
+        ? cookingTimeMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : [];
+        
+      const notesMatch = processedContent.match(/## Notes\s*([\s\S]*?)(?=##|$)/);
+      const notes = notesMatch
+        ? notesMatch[1].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : [];
+      
+      // Extract optional sections if present
+      const nutritionMatch = processedContent.match(/## (Nutritional Information|Nutrition)\s*([\s\S]*?)(?=##|$)/);
+      const nutrition = nutritionMatch
+        ? nutritionMatch[2].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : null;
+      
+      const storageMatch = processedContent.match(/## (Storage Instructions|Storage)\s*([\s\S]*?)(?=##|$)/);
+      const storage = storageMatch
+        ? storageMatch[2].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : null;
+      
+      const reheatingMatch = processedContent.match(/## (Reheating Instructions|Reheating)\s*([\s\S]*?)(?=##|$)/);
+      const reheating = reheatingMatch
+        ? reheatingMatch[2].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : null;
+      
+      const makeAheadMatch = processedContent.match(/## (Make Ahead Tips|Make Ahead)\s*([\s\S]*?)(?=##|$)/);
+      const makeAhead = makeAheadMatch
+        ? makeAheadMatch[2].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : null;
+      
+      const dietaryInfoMatch = processedContent.match(/## (Dietary Information|Substitutions|Dietary)\s*([\s\S]*?)(?=##|$)/);
+      const dietaryInfo = dietaryInfoMatch
+        ? dietaryInfoMatch[2].trim().split('\n').map(i => i.replace(/^[*-] /, '').trim()).filter(i => i)
+        : null;
+      
       return NextResponse.json({
         title,
         ingredients,
+        ingredientCategories: Object.keys(ingredientCategories).length > 0 ? ingredientCategories : null,
         instructions,
-        markdown: content,
+        cookingInfo: cookingInfo.length > 0 ? cookingInfo : null,
+        notes: notes.length > 0 ? notes : null,
+        nutrition: nutrition && nutrition.length > 0 ? nutrition : null,
+        storage: storage && storage.length > 0 ? storage : null,
+        reheating: reheating && reheating.length > 0 ? reheating : null,
+        makeAhead: makeAhead && makeAhead.length > 0 ? makeAhead : null,
+        dietaryInfo: dietaryInfo && dietaryInfo.length > 0 ? dietaryInfo : null,
+        markdown: processedContent,
         original: content,
         method: 'openai-gpt4o-mini',
         url: requestUrl

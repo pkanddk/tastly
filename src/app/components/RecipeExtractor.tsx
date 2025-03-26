@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { extractRecipeFromUrl } from '../lib/deepseek';
-import { TAGLINES, END_MESSAGES } from '@/lib/constants';
 
 const RecipeUrlInput = dynamic(() => import('@/components/RecipeUrlInput'), { 
   ssr: false 
