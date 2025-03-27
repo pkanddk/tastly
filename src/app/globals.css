@@ -2,169 +2,136 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 17 24 39;
-    --foreground: 255 255 255;
-    --card-bg: 18 18 18;
-    --border-color: 38 38 38;
-    --primary: 59 130 246;
-    --primary-foreground: 255 255 255;
-    --secondary: 30 41 59;
-    --secondary-foreground: 255 255 255;
-  }
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-rgb: 16, 19, 26; /* Darker background */
+  --header-height: 52px;
+  --footer-height: 52px;
+  --sidebar-width: 16rem;
+  --mini-sidebar-width: 4rem;
 }
 
-@layer base {
-  * {
-    border-color: rgb(var(--border-color));
-  }
-  body {
-    color: rgb(var(--foreground));
-    background-color: rgb(var(--background));
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow-x: hidden;
-  }
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
-html, body {
+/* Base styles */
+html {
   height: 100%;
-  margin: 0;
-  padding: 0;
-  background-color: #111827;
+  scroll-behavior: smooth;
 }
 
-body > div {
+body {
+  color: rgb(var(--foreground-rgb));
+  background-color: rgb(var(--background-rgb));
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  width: 100%;
-  flex: 1;
+  overflow-x: hidden;
 }
 
+a, button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mini sidebar adjustment */
+.sidebar-mini {
+  display: none !important;
+}
+
+/* Main content area - ALWAYS respect the sidebar on desktop */
 main {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-/* For pages with minimal content, this ensures the footer is at the bottom */
-main > div:only-child {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-footer {
-  flex-shrink: 0;
+  padding-top: 1rem;
+  padding-bottom: 3rem; 
+  margin-left: 0;
   width: 100%;
-  background-color: #1f2937;
-  margin-top: auto; /* This pushes the footer to the bottom when content is short */
+  position: relative;
+  z-index: 10;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@media (min-width: 768px) {
+  body.logged-in main {
+    margin-left: var(--mini-sidebar-width);
+    width: calc(100% - var(--mini-sidebar-width));
   }
 }
 
-.recipe-container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 1.5rem;
-  background-color: rgb(var(--card-bg));
-  border-radius: 1rem;
-  border: 1px solid rgb(var(--border-color));
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+/* Footer - ALWAYS respect the sidebar on desktop */
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--footer-height);
+  background-color: #10131a;
+  border-top: 1px solid #1f2937;
+  z-index: 30;
 }
 
-.recipe-title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: white;
+@media (min-width: 768px) {
+  body.logged-in footer {
+    margin-left: var(--mini-sidebar-width);
+    width: calc(100% - var(--mini-sidebar-width));
+  }
 }
 
-.recipe-section {
-  margin-bottom: 1.5rem;
+/* Hide scrollbars */
+::-webkit-scrollbar {
+  display: none;
 }
 
-.recipe-section-title {
-  font-size: 1.25rem;
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Recipe Card Styles */
+.recipe-card {
+  background-color: #1f2937;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recipe-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.recipe-card .recipe-image {
+  position: relative;
+  height: 150px;
+  width: 100%;
+  background-color: #374151;
+}
+
+.recipe-card .recipe-content {
+  padding: 1rem;
+}
+
+.recipe-card .recipe-title {
   font-weight: 600;
-  margin-bottom: 0.75rem;
-  color: rgb(var(--accent-color));
+  font-size: 1.125rem;
+  margin-bottom: 0.5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.recipe-ingredients-list {
-  list-style-type: none;
-  padding-left: 0;
-}
-
-.recipe-ingredients-list li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(var(--border-color), 0.5);
-}
-
-.recipe-instructions {
-  line-height: 1.8;
-}
-
-.recipe-instructions ol {
-  padding-left: 1.5rem;
-}
-
-.recipe-instructions li {
+.recipe-card .recipe-description {
+  color: #9ca3af;
+  font-size: 0.875rem;
   margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.recipe-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.recipe-meta-item {
+.recipe-card .recipe-meta {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background-color: rgb(var(--card-bg));
-  border-radius: 1rem;
-  border: 1px solid rgb(var(--border-color));
+  justify-content: space-between;
 }
 
 .loading-spinner {
-  border: 3px solid rgba(var(--border-color));
-  border-radius: 50%;
-  border-top: 3px solid rgb(var(--accent-color));
-  width: 2rem;
-  height: 2rem;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  @apply animate-spin h-5 w-5 border-t-2 border-blue-500 border-solid rounded-full;
 }

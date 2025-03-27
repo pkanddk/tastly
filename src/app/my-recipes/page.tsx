@@ -8,18 +8,32 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
 export default function MyRecipesPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [recipes, setRecipes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   
+  // Set mounted state
   useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  useEffect(() => {
+    // Skip if not mounted yet or still loading auth
+    if (!mounted) return;
+    
     async function loadRecipes() {
+      // Only attempt to load recipes if we have a user
       if (user) {
+        setIsLoading(true);
+        console.log("Loading recipes for user:", user.uid);
+        
         try {
           setError(null);
           const userRecipes = await getRecipesByUser(user.uid);
+          console.log("Recipes loaded:", userRecipes.length);
           setRecipes(userRecipes);
         } catch (error) {
           console.error('Error loading recipes:', error);
@@ -27,15 +41,18 @@ export default function MyRecipesPage() {
         } finally {
           setIsLoading(false);
         }
-      } else if (!loading) {
+      } else if (!authLoading) {
+        // If auth is done loading and we don't have a user, stop loading state
+        console.log("No user available - not loading recipes");
         setIsLoading(false);
       }
     }
     
-    if (!loading) {
+    // Only load recipes if auth is complete
+    if (!authLoading) {
       loadRecipes();
     }
-  }, [user, loading]);
+  }, [user, authLoading, mounted]);
   
   const handleDeleteRecipe = async (recipeId: string, e: React.MouseEvent) => {
     // Stop event propagation to prevent navigation when clicking delete
@@ -57,13 +74,20 @@ export default function MyRecipesPage() {
     router.push(`/recipes/${recipeId}`);
   };
   
+  // Return null if not mounted yet to avoid hydration issues
+  if (!mounted) return null;
+  
   // Show loading state
-  if (loading || isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="container mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-6">My Recipes</h1>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
+        <p className="text-center text-gray-400 mt-4">
+          {authLoading ? 'Checking login status...' : 'Loading your recipes...'}
+        </p>
       </div>
     );
   }

@@ -31,13 +31,13 @@ export const metadata: Metadata = {
     title: 'Tastly'
   },
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
-  themeColor: '#111827',
+  themeColor: '#10131a',
 }
 
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#111827',
+  themeColor: '#10131a',
 }
 
 export default function RootLayout({
@@ -53,11 +53,11 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
       </head>
-      <body className={`${inter.className} bg-gray-900 text-white min-h-screen flex flex-col relative`}>
+      <body className={`${inter.className} min-h-screen`}>
         <AuthProvider>
           <GroceryListProvider>
             <WelcomeBar />
-            <main className="flex-grow pt-16 relative z-0">
+            <main>
               {children}
             </main>
             <Footer />

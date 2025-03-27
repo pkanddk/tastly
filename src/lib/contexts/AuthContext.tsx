@@ -68,6 +68,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkRedirectResult();
   }, []);
 
+  // Add logged-in class to body when user is logged in
+  useEffect(() => {
+    if (user) {
+      document.body.classList.add('logged-in');
+    } else {
+      document.body.classList.remove('logged-in');
+    }
+  }, [user]);
+
   return (
     <AuthContext.Provider value={{ user, loading }}>
       {children}

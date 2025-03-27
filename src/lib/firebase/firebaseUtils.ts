@@ -217,16 +217,26 @@ export const saveRecipe = async (userId: string, recipe: any) => {
 
 export const getRecipesByUser = async (userId: string) => {
   try {
-    const querySnapshot = await getDocs(
-      query(collection(db, 'recipes'), where('userId', '==', userId))
-    );
+    console.log(`Fetching recipes for user: ${userId}`);
+    
+    if (!userId) {
+      console.error('No user ID provided to getRecipesByUser');
+      return [];
+    }
+    
+    const recipesRef = collection(db, 'recipes');
+    const q = query(recipesRef, where('userId', '==', userId));
+    
+    console.log('Executing Firestore query');
+    const querySnapshot = await getDocs(q);
+    console.log(`Query returned ${querySnapshot.size} recipes`);
     
     return querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
   } catch (error) {
-    console.error('Error getting recipes:', error);
+    console.error('Error in getRecipesByUser:', error);
     throw error;
   }
 };
@@ -242,19 +252,27 @@ export const deleteRecipe = async (recipeId: string) => {
 
 export const getRecipeById = async (recipeId: string) => {
   try {
+    if (!recipeId) {
+      console.error('No recipe ID provided to getRecipeById');
+      return null;
+    }
+    
+    console.log(`Fetching recipe with ID: ${recipeId}`);
     const docRef = doc(db, 'recipes', recipeId);
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
+      console.log(`Recipe found: ${recipeId}`);
       return {
         id: docSnap.id,
         ...docSnap.data()
       };
     } else {
-      throw new Error('Recipe not found');
+      console.log(`Recipe not found: ${recipeId}`);
+      return null;
     }
   } catch (error) {
-    console.error('Error getting recipe:', error);
+    console.error(`Error in getRecipeById for ${recipeId}:`, error);
     throw error;
   }
 };
