@@ -475,8 +475,18 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       // Convert centimeters to inches
       .replace(/(\d+(?:\.\d+)?)\s*cm/g, (_, num) => `${(parseFloat(num) * 0.393701).toFixed(1)} in`)
       // Convert Celsius to Fahrenheit
-      .replace(/(\d+(?:\.\d+)?)\s*°C/g, (_, num) => `${(parseFloat(num) * 9/5 + 32).toFixed(0)}°F`)
-      .replace(/(\d+(?:\.\d+)?)\s*degrees C/gi, (_, num) => `${(parseFloat(num) * 9/5 + 32).toFixed(0)} degrees F`)
+      .replace(/(\d+(?:\.\d+)?)\s*°C/g, (_, num) => {
+        // Round to nearest 5
+        const fahrenheit = Math.round(parseFloat(num) * 9/5 + 32);
+        const roundedFahrenheit = Math.round(fahrenheit / 5) * 5;
+        return `${roundedFahrenheit}°F`;
+      })
+      .replace(/(\d+(?:\.\d+)?)\s*degrees C/gi, (_, num) => {
+        // Round to nearest 5
+        const fahrenheit = Math.round(parseFloat(num) * 9/5 + 32);
+        const roundedFahrenheit = Math.round(fahrenheit / 5) * 5;
+        return `${roundedFahrenheit} degrees F`;
+      })
       // British measurements
       .replace(/(\d+(?:\.\d+)?)\s*stone/g, (_, num) => `${(parseFloat(num) * 14).toFixed(1)} lb`)
       .replace(/(\d+(?:\.\d+)?)\s*grammes/g, (_, num) => `${(parseFloat(num) * 0.035274).toFixed(1)} oz`);
@@ -585,6 +595,11 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       // Split the content by section headers
       const sections = contentWithoutTitle.split(/^## /m);
       
+      // Organize sections by type
+      let mainSections = [];
+      let storageSection = null;
+      let reheatingSection = null;
+      
       // Process each section
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i];
@@ -595,33 +610,59 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
         const sectionTitle = sectionParts[0].trim();
         let sectionContent = sectionParts.length > 1 ? section.substring(sectionParts[0].length + 1) : '';
         
-        // Add section header - use negative margin for the first section to pull it closer to the line
+        // Check if it's a storage or reheating section
+        const titleLower = sectionTitle.toLowerCase();
+        if (titleLower.includes('storage') || titleLower.includes('storing') || titleLower.includes('store')) {
+          storageSection = { title: sectionTitle, content: sectionContent };
+          continue;
+        } else if (titleLower.includes('reheat') || titleLower.includes('reheating')) {
+          reheatingSection = { title: sectionTitle, content: sectionContent };
+          continue;
+        }
+        
+        // Add to main sections
+        mainSections.push({ title: sectionTitle, content: sectionContent });
+      }
+      
+      // Render main sections
+      for (let i = 0; i < mainSections.length; i++) {
+        const { title, content } = mainSections[i];
+        
+        // Add section header
         let headerClass = "text-2xl font-bold text-blue-400 mb-4 text-center";
-        if (i === 0 && sectionTitle.toLowerCase() === 'ingredients') {
+        if (i === 0 && title.toLowerCase() === 'ingredients') {
           headerClass = "text-2xl font-bold text-blue-400 mb-4 text-center -mt-4";
         }
-        formattedContent += `<h2 class="${headerClass}">${sectionTitle}</h2>`;
+        formattedContent += `<h2 class="${headerClass}">${title}</h2>`;
         
         // Special handling for Ingredients section
-        if (sectionTitle.toLowerCase() === 'ingredients') {
-          // Remove decorative divider
-          
+        if (title.toLowerCase() === 'ingredients') {
           // Add checkbox helper text
           formattedContent += `<p class="text-sm text-gray-400 italic text-center mb-4">Check off ingredients as you go. Your progress will be saved.</p>`;
-          formattedContent += processIngredientsSection(sectionContent, recipeId, isIngredientChecked);
+          formattedContent += processIngredientsSection(content, recipeId, isIngredientChecked);
         } 
         // Special handling for Instructions section
-        else if (sectionTitle.toLowerCase() === 'instructions') {
-          // Remove decorative divider
-          
+        else if (title.toLowerCase() === 'instructions') {
           // Add checkbox helper text for instructions
           formattedContent += `<p class="text-sm text-gray-400 italic text-center mb-4">Check off steps as you complete them.</p>`;
-          formattedContent += processInstructionsSection(sectionContent);
+          formattedContent += processInstructionsSection(content);
         } 
         // Handle other sections
         else {
-          formattedContent += processGenericSection(sectionContent);
+          formattedContent += processGenericSection(content);
         }
+      }
+      
+      // Add storage section if available
+      if (storageSection) {
+        formattedContent += `<h2 class="text-2xl font-bold text-blue-400 mb-4 text-center">Storage Instructions</h2>`;
+        formattedContent += processGenericSection(storageSection.content);
+      }
+      
+      // Add reheating section if available
+      if (reheatingSection) {
+        formattedContent += `<h2 class="text-2xl font-bold text-blue-400 mb-4 text-center">Reheating Instructions</h2>`;
+        formattedContent += processGenericSection(reheatingSection.content);
       }
       
       return formattedContent;
@@ -709,11 +750,113 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
         : new Map();
       
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        let line = lines[i].trim();
+        
+        // Skip nutritional information within instructions
+        if (line.toLowerCase().includes('nutritional information') || 
+            line.toLowerCase().includes('nutrition information') ||
+            line.toLowerCase().includes('nutrition facts') ||
+            line.toLowerCase().includes('per serving')) {
+          // Skip this line and the next few lines that likely contain nutrition data
+          let skipCount = 0;
+          while (i + 1 < lines.length && skipCount < 5) {
+            i++;
+            skipCount++;
+            // Break if we hit a new numbered instruction
+            if (lines[i].match(/^\d+\.\s/)) {
+              i--;  // Go back one to process this as a normal instruction
+              break;
+            }
+          }
+          continue;
+        }
+        
         // Check for numbered list items
         const instructionMatch = line.match(/^\d+\.\s*(.+)$/);
         if (instructionMatch) {
           let instruction = instructionMatch[1];
+          
+          // Apply temperature conversion if needed
+          if (unitSystem === 'imperial') {
+            // Handle combined temperature formats like "200C/180C fan/gas 6"
+            instruction = instruction.replace(/(\d+)[Cc]\s*\/\s*(\d+)[Cc]\s*fan\s*\/\s*gas\s*(\d+)/g, (match, temp1, temp2, gas) => {
+              const fahrenheit1 = Math.round(parseFloat(temp1) * 9/5 + 32);
+              const fahrenheit2 = Math.round(parseFloat(temp2) * 9/5 + 32);
+              // Round to nearest 5
+              const roundedF1 = Math.round(fahrenheit1 / 5) * 5;
+              const roundedF2 = Math.round(fahrenheit2 / 5) * 5;
+              return `${roundedF1}°F (${roundedF2}°F fan)`;
+            });
+            
+            // Convert standard temperatures
+            instruction = instruction.replace(/(\d+)(\s*)(°C|degrees C|deg C)/gi, (match, temp, space, unit) => {
+              const fahrenheit = Math.round(parseFloat(temp) * 9/5 + 32);
+              // Round to nearest 5
+              const roundedFahrenheit = Math.round(fahrenheit / 5) * 5;
+              return `${roundedFahrenheit}°F`;
+            });
+            
+            // Handle special cases like "200°C (180°C fan)"
+            instruction = instruction.replace(/(\d+)(\s*)(°C|degrees C|deg C)(\s*)\((\d+)(\s*)(°C|degrees C|deg C)(\s*)fan\)/gi, 
+              (match, temp1, space1, unit1, space2, temp2, space3, unit2, space4) => {
+                const fahrenheit1 = Math.round(parseFloat(temp1) * 9/5 + 32);
+                const fahrenheit2 = Math.round(parseFloat(temp2) * 9/5 + 32);
+                // Round to nearest 5
+                const roundedF1 = Math.round(fahrenheit1 / 5) * 5;
+                const roundedF2 = Math.round(fahrenheit2 / 5) * 5;
+                return `${roundedF1}°F (${roundedF2}°F fan)`;
+            });
+            
+            // Convert gas mark references
+            instruction = instruction.replace(/gas\s*mark\s*(\d+)/gi, (match, gas) => {
+              // Simple conversion from gas mark to Fahrenheit
+              const gasToF: Record<string, string> = {
+                '1': '275',
+                '2': '300',
+                '3': '325',
+                '4': '350',
+                '5': '375',
+                '6': '400',
+                '7': '425',
+                '8': '450',
+                '9': '475'
+              };
+              const gasNum = gas as string;
+              return `${gasToF[gasNum] || (parseInt(gasNum) * 25 + 250)}°F`;
+            });
+            
+            // Convert gas number references
+            instruction = instruction.replace(/gas\s*(\d+)/gi, (match, gas) => {
+              // Simple conversion from gas mark to Fahrenheit
+              const gasToF: Record<string, string> = {
+                '1': '275',
+                '2': '300',
+                '3': '325',
+                '4': '350',
+                '5': '375',
+                '6': '400',
+                '7': '425',
+                '8': '450',
+                '9': '475'
+              };
+              const gasNum = gas as string;
+              return `${gasToF[gasNum] || (parseInt(gasNum) * 25 + 250)}°F`;
+            });
+          } else {
+            // Convert temperatures from Fahrenheit to Celsius
+            instruction = instruction.replace(/(\d+)(\s*)(°F|degrees F|deg F)/gi, (match, temp, space, unit) => {
+              const celsius = Math.round((parseFloat(temp) - 32) * 5/9);
+              return `${celsius}°C`;
+            });
+            
+            // Handle special cases like "400°F (375°F fan)"
+            instruction = instruction.replace(/(\d+)(\s*)(°F|degrees F|deg F)(\s*)\((\d+)(\s*)(°F|degrees F|deg F)(\s*)fan\)/gi, 
+              (match, temp1, space1, unit1, space2, temp2, space3, unit2, space4) => {
+                const celsius1 = Math.round((parseFloat(temp1) - 32) * 5/9);
+                const celsius2 = Math.round((parseFloat(temp2) - 32) * 5/9);
+                return `${celsius1}°C (${celsius2}°C fan)`;
+            });
+          }
           
           // Add measurements to instruction text if available
           if (ingredientMeasurements && ingredientMeasurements.size > 0) {
@@ -783,7 +926,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       let inList = false;
       
       for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        let line = lines[i].trim();
         
         if (!line) {
           if (inList) {
@@ -791,6 +934,103 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
             inList = false;
           }
           continue;
+        }
+        
+        // Skip nutritional information section
+        if (line.toLowerCase().includes('nutritional information') || 
+            line.toLowerCase().includes('nutrition information') ||
+            line.toLowerCase().includes('nutrition facts')) {
+          // Skip this section until we find an empty line or a new section header
+          while (i + 1 < lines.length && !lines[i + 1].match(/^##\s/)) {
+            i++;
+            // Break if we hit an empty line that might signal end of section
+            if (!lines[i].trim()) {
+              break;
+            }
+          }
+          continue;
+        }
+        
+        // Apply temperature conversion if needed
+        if (unitSystem === 'imperial') {
+          // Handle combined temperature formats like "200C/180C fan/gas 6"
+          line = line.replace(/(\d+)[Cc]\s*\/\s*(\d+)[Cc]\s*fan\s*\/\s*gas\s*(\d+)/g, (match, temp1, temp2, gas) => {
+            const fahrenheit1 = Math.round(parseFloat(temp1) * 9/5 + 32);
+            const fahrenheit2 = Math.round(parseFloat(temp2) * 9/5 + 32);
+            // Round to nearest 5
+            const roundedF1 = Math.round(fahrenheit1 / 5) * 5;
+            const roundedF2 = Math.round(fahrenheit2 / 5) * 5;
+            return `${roundedF1}°F (${roundedF2}°F fan)`;
+          });
+          
+          // Convert standard temperatures
+          line = line.replace(/(\d+)(\s*)(°C|degrees C|deg C)/gi, (match, temp, space, unit) => {
+            const fahrenheit = Math.round(parseFloat(temp) * 9/5 + 32);
+            // Round to nearest 5
+            const roundedFahrenheit = Math.round(fahrenheit / 5) * 5;
+            return `${roundedFahrenheit}°F`;
+          });
+          
+          // Handle special cases like "200°C (180°C fan)"
+          line = line.replace(/(\d+)(\s*)(°C|degrees C|deg C)(\s*)\((\d+)(\s*)(°C|degrees C|deg C)(\s*)fan\)/gi, 
+            (match, temp1, space1, unit1, space2, temp2, space3, unit2, space4) => {
+              const fahrenheit1 = Math.round(parseFloat(temp1) * 9/5 + 32);
+              const fahrenheit2 = Math.round(parseFloat(temp2) * 9/5 + 32);
+              // Round to nearest 5
+              const roundedF1 = Math.round(fahrenheit1 / 5) * 5;
+              const roundedF2 = Math.round(fahrenheit2 / 5) * 5;
+              return `${roundedF1}°F (${roundedF2}°F fan)`;
+          });
+          
+          // Convert gas mark references
+          line = line.replace(/gas\s*mark\s*(\d+)/gi, (match, gas) => {
+            // Simple conversion from gas mark to Fahrenheit
+            const gasToF: Record<string, string> = {
+              '1': '275',
+              '2': '300',
+              '3': '325',
+              '4': '350',
+              '5': '375',
+              '6': '400',
+              '7': '425',
+              '8': '450',
+              '9': '475'
+            };
+            const gasNum = gas as string;
+            return `${gasToF[gasNum] || (parseInt(gasNum) * 25 + 250)}°F`;
+          });
+          
+          // Convert gas number references
+          line = line.replace(/gas\s*(\d+)/gi, (match, gas) => {
+            // Simple conversion from gas mark to Fahrenheit
+            const gasToF: Record<string, string> = {
+              '1': '275',
+              '2': '300',
+              '3': '325',
+              '4': '350',
+              '5': '375',
+              '6': '400',
+              '7': '425',
+              '8': '450',
+              '9': '475'
+            };
+            const gasNum = gas as string;
+            return `${gasToF[gasNum] || (parseInt(gasNum) * 25 + 250)}°F`;
+          });
+        } else {
+          // Convert temperatures from Fahrenheit to Celsius
+          line = line.replace(/(\d+)(\s*)(°F|degrees F|deg F)/gi, (match, temp, space, unit) => {
+            const celsius = Math.round((parseFloat(temp) - 32) * 5/9);
+            return `${celsius}°C`;
+          });
+          
+          // Handle special cases like "400°F (375°F fan)"
+          line = line.replace(/(\d+)(\s*)(°F|degrees F|deg F)(\s*)\((\d+)(\s*)(°F|degrees F|deg F)(\s*)fan\)/gi, 
+            (match, temp1, space1, unit1, space2, temp2, space3, unit2, space4) => {
+              const celsius1 = Math.round((parseFloat(temp1) - 32) * 5/9);
+              const celsius2 = Math.round((parseFloat(temp2) - 32) * 5/9);
+              return `${celsius1}°C (${celsius2}°C fan)`;
+          });
         }
         
         // Check for list items
@@ -957,17 +1197,17 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
-            {recipeAddedToList ? 'Added to List' : 'Add to Grocery List'}
+            {recipeAddedToList ? 'Added to List' : 'Add to Groceries'}
           </button>
           
           {/* Unit toggle button */}
           <button
             onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
-            title={unitSystem === 'metric' ? 'Switch to Imperial (oz, lb)' : 'Switch to Metric (g, kg)'}
+            title={unitSystem === 'metric' ? 'Switch to Freedom Units (oz, lb)' : 'Switch to Science Units (g, kg)'}
           >
             <div className="flex items-center justify-center w-6 relative">
-              {/* American Flag (Imperial) */}
+              {/* American Flag (Imperial/Freedom) */}
               <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
                   <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
@@ -979,7 +1219,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
                 </svg>
               </div>
               
-              {/* British Flag (Metric) */}
+              {/* British Flag (Metric/Science) */}
               <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
                   <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
@@ -992,7 +1232,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
                 </svg>
               </div>
             </div>
-            <span>{unitSystem === 'metric' ? 'Metric' : 'Imperial'}</span>
+            <span>{unitSystem === 'metric' ? 'Science' : 'Freedom'}</span>
           </button>
           
           {/* Share button */}
@@ -1143,17 +1383,17 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
-          {recipeAddedToList ? 'Added to List' : 'Add to Grocery List'}
+          {recipeAddedToList ? 'Added to List' : 'Add to Groceries'}
         </button>
         
         {/* Unit toggle button */}
         <button
           onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
           className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
-          title={unitSystem === 'metric' ? 'Switch to Imperial (oz, lb)' : 'Switch to Metric (g, kg)'}
+          title={unitSystem === 'metric' ? 'Switch to Freedom Units (oz, lb)' : 'Switch to Science Units (g, kg)'}
         >
           <div className="flex items-center justify-center w-6 relative">
-            {/* American Flag (Imperial) */}
+            {/* American Flag (Imperial/Freedom) */}
             <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
                 <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
@@ -1165,7 +1405,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
               </svg>
             </div>
             
-            {/* British Flag (Metric) */}
+            {/* British Flag (Metric/Science) */}
             <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
                 <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
@@ -1178,7 +1418,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
               </svg>
             </div>
           </div>
-          <span>{unitSystem === 'metric' ? 'Metric' : 'Imperial'}</span>
+          <span>{unitSystem === 'metric' ? 'Science' : 'Freedom'}</span>
         </button>
         
         {/* Share button */}

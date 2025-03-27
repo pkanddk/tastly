@@ -23,7 +23,7 @@ export default function Footer() {
             onClick={openGroceryList}
             className="text-sm text-gray-400 hover:text-white transition-colors"
           >
-            grocery list
+            groceries
           </button>
           
           <Link 

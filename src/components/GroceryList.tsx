@@ -488,18 +488,18 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
             </svg>
           </button>
         
-        <h2 className="text-2xl font-bold text-white mb-4">Grocery List</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">Groceries</h2>
         
         {/* Tab navigation with horizontal scrolling */}
         <div className="relative mb-4">
           {/* Scrollable container */}
           <div className="flex space-x-2 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1">
             {/* All Items tab is always present */}
-          <button
+            <button
               onClick={() => setActiveTab('all')}
               className={`px-4 py-2 rounded-lg flex-shrink-0 ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-          >
-            All Items
+            >
+              All Items
             </button>
             
             {/* Recipe tabs with X buttons */}
@@ -507,11 +507,12 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
               <div key={recipe.id} className="flex-shrink-0 relative">
                 <button
                   onClick={() => setActiveTab(recipe.id)}
-                  className={`px-4 pr-8 py-2 rounded-lg whitespace-nowrap ${activeTab === recipe.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                  className={`px-4 pr-8 py-2 rounded-lg whitespace-nowrap overflow-hidden ${activeTab === recipe.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                  style={{ maxWidth: '180px', textOverflow: 'ellipsis' }}
                 >
                   {recipe.name}
-          </button>
-          <button
+                </button>
+                <button
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent triggering the tab button click
                     removeRecipe(recipe.id);
@@ -522,7 +523,7 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
-          </button>
+                </button>
               </div>
             ))}
           </div>
