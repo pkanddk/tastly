@@ -60,6 +60,9 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  
+  // Add state for unit system preference
+  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
    
   // Add state for grocery list view mode
   const [groceryListMode, setGroceryListMode] = useState<'all' | 'sections'>('all');
@@ -430,6 +433,112 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
     setRecipeAddedToList(true);
   };
   
+  // Add effect to re-render content when unit system changes
+  useEffect(() => {
+    // Force re-render of recipe content when unit system changes
+    if (recipe) {
+      // For string content (markdown), we need to reprocess the content
+      if (typeof recipe === 'string') {
+        const processed = recipe.replace(
+          /(## Ingredients\n+)(For the [^:]+:)/g,
+          (_: string, prefix: string, categoryName: string) => {
+            const cleanCategoryName = categoryName.replace(/^For the\s+/i, '');
+            return `${prefix}### ${cleanCategoryName}`;
+          }
+        );
+        // Force a re-render by adding a non-visible character that changes
+        setProcessedContent(processed + (unitSystem === 'imperial' ? ' ' : ''));
+      } else if (typeof recipe === 'object') {
+        // For structured recipes, the conversions are applied directly in the render
+        // Force a refresh by toggling a non-visible character in processedContent
+        setProcessedContent(unitSystem === 'imperial' ? ' ' : '');
+      }
+    }
+  }, [unitSystem, recipe]);
+  
+  // Unit conversion utility functions
+  const convertToImperial = (ingredient: string): string => {
+    // Special case for items like "1 lime, juiced" - don't convert these
+    if (/\b(?:lime|lemon|orange|grapefruit),\s*(?:juiced|zested|sliced)/i.test(ingredient)) {
+      return ingredient;
+    }
+
+    return ingredient
+      // Convert grams to ounces
+      .replace(/(\d+(?:\.\d+)?)\s*g(?!\w|\s*r)/g, (_, num) => `${(parseFloat(num) * 0.035274).toFixed(1)} oz`)
+      // Convert kilograms to pounds
+      .replace(/(\d+(?:\.\d+)?)\s*kg/g, (_, num) => `${(parseFloat(num) * 2.20462).toFixed(1)} lb`)
+      // Convert milliliters to fluid ounces
+      .replace(/(\d+(?:\.\d+)?)\s*ml/g, (_, num) => `${(parseFloat(num) * 0.033814).toFixed(1)} fl oz`)
+      // Convert liters to cups
+      .replace(/(\d+(?:\.\d+)?)\s*l(?!\w)/g, (_, num) => `${(parseFloat(num) * 4.22675).toFixed(1)} cups`)
+      // Convert centimeters to inches
+      .replace(/(\d+(?:\.\d+)?)\s*cm/g, (_, num) => `${(parseFloat(num) * 0.393701).toFixed(1)} in`)
+      // Convert Celsius to Fahrenheit
+      .replace(/(\d+(?:\.\d+)?)\s*°C/g, (_, num) => `${(parseFloat(num) * 9/5 + 32).toFixed(0)}°F`)
+      .replace(/(\d+(?:\.\d+)?)\s*degrees C/gi, (_, num) => `${(parseFloat(num) * 9/5 + 32).toFixed(0)} degrees F`)
+      // British measurements
+      .replace(/(\d+(?:\.\d+)?)\s*stone/g, (_, num) => `${(parseFloat(num) * 14).toFixed(1)} lb`)
+      .replace(/(\d+(?:\.\d+)?)\s*grammes/g, (_, num) => `${(parseFloat(num) * 0.035274).toFixed(1)} oz`);
+  };
+
+  const convertToMetric = (ingredient: string): string => {
+    // Special case for items like "1 lime, juiced" - don't convert these
+    if (/\b(?:lime|lemon|orange|grapefruit),\s*(?:juiced|zested|sliced)/i.test(ingredient)) {
+      return ingredient;
+    }
+
+    return ingredient
+      // Convert ounces to grams
+      .replace(/(\d+(?:\.\d+)?)\s*oz(?!\w)/g, (_, num) => `${(parseFloat(num) * 28.3495).toFixed(0)} g`)
+      // Convert pounds to kilograms
+      .replace(/(\d+(?:\.\d+)?)\s*lb/g, (_, num) => `${(parseFloat(num) * 0.453592).toFixed(1)} kg`)
+      .replace(/(\d+(?:\.\d+)?)\s*pound/g, (_, num) => `${(parseFloat(num) * 0.453592).toFixed(1)} kg`)
+      // Convert fluid ounces to milliliters
+      .replace(/(\d+(?:\.\d+)?)\s*fl\s*oz/g, (_, num) => `${(parseFloat(num) * 29.5735).toFixed(0)} ml`)
+      // Convert cups to milliliters
+      .replace(/(\d+(?:\.\d+)?)\s*cups?/g, (_, num) => `${(parseFloat(num) * 236.588).toFixed(0)} ml`)
+      // Convert teaspoons to milliliters (approximate)
+      .replace(/(\d+(?:\.\d+)?)\s*tsp/g, (_, num) => `${(parseFloat(num) * 5).toFixed(0)} ml`)
+      // Convert tablespoons to milliliters (approximate)
+      .replace(/(\d+(?:\.\d+)?)\s*tbsp/g, (_, num) => `${(parseFloat(num) * 15).toFixed(0)} ml`)
+      // Convert inches to centimeters
+      .replace(/(\d+(?:\.\d+)?)\s*in(?:ch)?(?:es)?/g, (_, num) => `${(parseFloat(num) * 2.54).toFixed(1)} cm`)
+      // Convert Fahrenheit to Celsius
+      .replace(/(\d+(?:\.\d+)?)\s*°F/g, (_, num) => `${((parseFloat(num) - 32) * 5/9).toFixed(0)}°C`)
+      .replace(/(\d+(?:\.\d+)?)\s*degrees F/gi, (_, num) => `${((parseFloat(num) - 32) * 5/9).toFixed(0)} degrees C`)
+      // Convert pints to milliliters (British pint = 568ml)
+      .replace(/(\d+(?:\.\d+)?)\s*pints?/g, (_, num) => `${(parseFloat(num) * 568).toFixed(0)} ml`);
+  };
+
+  const convertUnits = (ingredient: string): string => {
+    return unitSystem === 'imperial' ? 
+      convertToImperial(ingredient) : 
+      convertToMetric(ingredient);
+  };
+
+  // Function to share recipe
+  const handleShareRecipe = () => {
+    const title = typeof recipe === 'string' 
+      ? (recipe.match(/# (.+?)(\n|$)/)?.[1] || 'Recipe')
+      : recipe.title;
+      
+    if (navigator.share) {
+      navigator.share({
+        title: title,
+        text: `Check out this ${title} recipe!`,
+        url: window.location.href
+      }).catch(err => {
+        console.error('Error sharing recipe:', err);
+        navigator.clipboard.writeText(window.location.href);
+        alert('Recipe link copied to clipboard!');
+      });
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      alert('Recipe link copied to clipboard!');
+    }
+  };
+  
   // If we have markdown content, render it
   if (typeof recipe === 'string') {
     // Extract metadata from markdown if possible
@@ -524,6 +633,9 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       const lines = content.split('\n');
       let currentCategory = '';
       
+      // Create a map to store ingredient measurements for use in instructions
+      const ingredientMeasurements: Map<string, string> = new Map();
+      
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         
@@ -540,7 +652,22 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
         
         // Check for ingredient lines
         if (line.startsWith('- ')) {
-          const ingredient = line.substring(2).trim();
+          let ingredient = line.substring(2).trim();
+          
+          // Apply unit conversion if needed
+          if (unitSystem === 'imperial') {
+            ingredient = convertToImperial(ingredient);
+          }
+          
+          // Store ingredient measurement and name for use in instructions
+          // Try to extract measurement and ingredient name
+          const measurementMatch = ingredient.match(/^([\d\s\/\.\-]+\s*(?:tsp|tbsp|cup|oz|g|ml|lb|kg|pinch|dash|to taste)s?\.?)\s+(.+)$/i);
+          if (measurementMatch) {
+            const [_, measurement, ingredientName] = measurementMatch;
+            // Store lowercase ingredient name for case-insensitive matching
+            ingredientMeasurements.set(ingredientName.toLowerCase(), measurement.trim());
+          }
+          
           const ingredientId = `${recipeId}-${ingredient.replace(/\s+/g, '-').toLowerCase()}`;
           
           result += `
@@ -562,6 +689,11 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
         }
       }
       
+      // Store the measurement map in window object for access in instructions
+      if (typeof window !== 'undefined') {
+        (window as any).ingredientMeasurements = ingredientMeasurements;
+      }
+      
       result += '</div>';
       return result;
     };
@@ -571,12 +703,57 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       let result = '<div class="space-y-6 mb-8">';
       const lines = content.split('\n');
       
+      // Get ingredient measurements saved from ingredients section
+      const ingredientMeasurements = (typeof window !== 'undefined') 
+        ? (window as any).ingredientMeasurements || new Map() 
+        : new Map();
+      
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i].trim();
         // Check for numbered list items
         const instructionMatch = line.match(/^\d+\.\s*(.+)$/);
         if (instructionMatch) {
-          const instruction = instructionMatch[1];
+          let instruction = instructionMatch[1];
+          
+          // Add measurements to instruction text if available
+          if (ingredientMeasurements && ingredientMeasurements.size > 0) {
+            // For each ingredient name in our measurements map
+            ingredientMeasurements.forEach((measurement: string, ingredientName: string) => {
+              // Skip adding measurements for main ingredients that don't need precise measurements
+              const skipMeasurementIngredients = /\b(pork|chicken|beef|lamb|salmon|fish|turkey|tofu|eggplant|cauliflower|steak)\b/i;
+              if (skipMeasurementIngredients.test(ingredientName)) {
+                return;
+              }
+              
+              // Only add measurements for specific ingredients that need precise measurements
+              const needsMeasurement = /\b(salt|pepper|cumin|paprika|garlic powder|onion powder|oregano|basil|thyme|cayenne|sugar|honey|vinegar|oil|butter|flour|cornstarch|baking soda|baking powder|cream|milk|water|broth|stock|sauce|syrup)\b/i;
+              
+              if (!needsMeasurement.test(ingredientName)) {
+                return;
+              }
+              
+              // Convert measurement if needed
+              const displayMeasurement = unitSystem === 'imperial' ? 
+                convertToImperial(measurement) : measurement;
+              
+              // Look for the ingredient name in the instruction (case insensitive)
+              const regex = new RegExp(
+                // Avoid matching if measurement is already there
+                `(?<!\\d\\s*(?:tsp|tbsp|cup|oz|g|ml|lb|kg|pinch|dash)s?\\s+)\\b${
+                  // Escape special regex characters in ingredient name
+                  ingredientName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                }\\b`, 
+                'gi'
+              );
+              
+              // Replace with measurement + ingredient name
+              instruction = instruction.replace(
+                regex, 
+                `${displayMeasurement} ${ingredientName}`
+              );
+            });
+          }
+          
           const instructionId = `${recipeId}-instruction-${i}`;
           
           result += `
@@ -783,6 +960,52 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
             {recipeAddedToList ? 'Added to List' : 'Add to Grocery List'}
           </button>
           
+          {/* Unit toggle button */}
+          <button
+            onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+            title={unitSystem === 'metric' ? 'Switch to Imperial (oz, lb)' : 'Switch to Metric (g, kg)'}
+          >
+            <div className="flex items-center justify-center w-6 relative">
+              {/* American Flag (Imperial) */}
+              <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                  <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                  <g fill="#d80027">
+                    <path d="M0 85.33h512v42.67H0zM0 170.67h512v42.67H0zM0 256h512v42.67H0zM0 341.33h512V384H0z"/>
+                  </g>
+                  <path fill="#2e52b2" d="M0 85.33h256v198.67H0z"/>
+                  <path fill="#f0f0f0" d="m99.82 160.624-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569L0 160.624l23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569zm93.887 0-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569-23.136-11.064 23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569z"/>
+                </svg>
+              </div>
+              
+              {/* British Flag (Metric) */}
+              <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                  <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                  <path fill="#0052b4" d="M0 85.33h512v341.33H0z"/>
+                  <path fill="#f0f0f0" d="M512 85.33v42.663L341.331 256l170.667 128v42.667H426.67L256 298.667 85.333 426.666H0v-42.666L170.667 256 0 128V85.333h85.333L256 213.334l170.667-128z"/>
+                  <path d="M288 85.33h-64v138.67H0v64h224v138.67h64V288h224v-64H288z" fill="#f0f0f0"/>
+                  <g fill="#d80027">
+                    <path d="M0 85.33v30.933L151.467 256 0 395.737v30.93h30.933L213.333 256 30.933 85.333zM481.067 85.33H512v30.933L360.533 256 512 395.737v30.93h-30.933L298.667 256 481.067 85.333zM256 85.33v47.186L139.638 85.33H256zM256 426.67V379.48l116.364 47.19z"/>
+                  </g>
+                </svg>
+              </div>
+            </div>
+            <span>{unitSystem === 'metric' ? 'Metric' : 'Imperial'}</span>
+          </button>
+          
+          {/* Share button */}
+          <button
+            onClick={handleShareRecipe}
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            Share
+          </button>
+          
           <button
             onClick={resetChecklist}
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -923,6 +1146,52 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
           {recipeAddedToList ? 'Added to List' : 'Add to Grocery List'}
         </button>
         
+        {/* Unit toggle button */}
+        <button
+          onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
+          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+          title={unitSystem === 'metric' ? 'Switch to Imperial (oz, lb)' : 'Switch to Metric (g, kg)'}
+        >
+          <div className="flex items-center justify-center w-6 relative">
+            {/* American Flag (Imperial) */}
+            <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                <g fill="#d80027">
+                  <path d="M0 85.33h512v42.67H0zM0 170.67h512v42.67H0zM0 256h512v42.67H0zM0 341.33h512V384H0z"/>
+                </g>
+                <path fill="#2e52b2" d="M0 85.33h256v198.67H0z"/>
+                <path fill="#f0f0f0" d="m99.82 160.624-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569L0 160.624l23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569zm93.887 0-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569-23.136-11.064 23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569z"/>
+              </svg>
+            </div>
+            
+            {/* British Flag (Metric) */}
+            <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                <path fill="#0052b4" d="M0 85.33h512v341.33H0z"/>
+                <path fill="#f0f0f0" d="M512 85.33v42.663L341.331 256l170.667 128v42.667H426.67L256 298.667 85.333 426.666H0v-42.666L170.667 256 0 128V85.333h85.333L256 213.334l170.667-128z"/>
+                <path d="M288 85.33h-64v138.67H0v64h224v138.67h64V288h224v-64H288z" fill="#f0f0f0"/>
+                <g fill="#d80027">
+                  <path d="M0 85.33v30.933L151.467 256 0 395.737v30.93h30.933L213.333 256 30.933 85.333zM481.067 85.33H512v30.933L360.533 256 512 395.737v30.93h-30.933L298.667 256 481.067 85.333zM256 85.33v47.186L139.638 85.33H256zM256 426.67V379.48l116.364 47.19z"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+          <span>{unitSystem === 'metric' ? 'Metric' : 'Imperial'}</span>
+        </button>
+        
+        {/* Share button */}
+        <button
+          onClick={handleShareRecipe}
+          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          Share
+        </button>
+        
         <button
           onClick={resetChecklist}
           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
@@ -933,220 +1202,8 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
           Reset Checkboxes
         </button>
       </div>
-      
-      {/* Content with proper padding */}
-      <div className="px-6 md:px-8 pb-6 mt-4">
-        <div className="mt-4 prose prose-invert max-w-none">
-          {/* Title */}
-          <h1 className="text-3xl font-bold text-white mb-6 text-center">{recipe.title}</h1>
-          
-          {/* Cooking Time and Servings - MOVED DIRECTLY UNDER TITLE */}
-          {recipe.cookingInfo && (
-            <div className="mb-0">
-              <ul className="space-y-3 mb-4">
-                {recipe.cookingInfo.map((item: string, index: number) => (
-                  <li key={index} className="py-1 mb-1 text-center">{item}</li>
-                ))}
-              </ul>
-              <div className="border-t border-gray-700 pt-4 mt-6 mb-0"></div>
-            </div>
-          )}
-          
-          {/* Ingredients with checkboxes - use negative margin to reduce space */}
-          <h2 className="text-2xl font-bold text-blue-400 mb-4 text-center -mt-4">Ingredients</h2>
-          
-          {/* Remove decorative divider */}
-          
-          <p className="text-sm text-gray-400 italic text-center mb-4">Check off ingredients as you go. Your progress will be saved.</p>
-          {recipe.ingredientCategories ? (
-            <div className="mb-10">
-              {Object.entries(recipe.ingredientCategories as Record<string, string[]>).map(([category, ingredients], index) => (
-                <div key={index} className="mb-10">
-                  <h3 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{category.replace(/^For the\s+/i, '')}</h3>
-                  <ul className="space-y-3 pl-2 mt-4">
-                    {ingredients.map((ingredient: string, idx: number) => (
-                      <li key={idx} className="py-1 mb-1 flex items-start gap-4 pl-2">
-                        <input
-                          type="checkbox"
-                          id={`${recipeId}-${category}-${idx}`}
-                          checked={isIngredientChecked(ingredient)}
-                          onChange={() => toggleIngredient(ingredient)}
-                          className="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                        />
-                        <label 
-                          htmlFor={`${recipeId}-${category}-${idx}`}
-                          className={`cursor-pointer ${isIngredientChecked(ingredient) ? 'line-through text-gray-500' : ''}`}
-                        >
-                          {ingredient}
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          ) : (
-            // Render flat ingredient list with checkboxes
-            <ul className="space-y-3 mb-8 pl-2">
-              {recipe.ingredients.map((ingredient: string, index: number) => (
-                <li key={index} className="py-1 mb-1 flex items-start gap-4 pl-2">
-                  <input
-                    type="checkbox"
-                    id={`${recipeId}-ingredient-${index}`}
-                    checked={isIngredientChecked(ingredient)}
-                    onChange={() => toggleIngredient(ingredient)}
-                    className="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                  />
-                  <label 
-                    htmlFor={`${recipeId}-ingredient-${index}`}
-                    className={`cursor-pointer ${isIngredientChecked(ingredient) ? 'line-through text-gray-500' : ''}`}
-                  >
-                    {ingredient}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-          
-          {/* Divider between sections */}
-          <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-          
-          {/* Instructions with checkboxes */}
-          <h2 className="text-2xl font-bold text-blue-400 mb-4 text-center">Instructions</h2>
-          
-          {/* Remove decorative divider */}
-          
-          <p className="text-sm text-gray-400 italic text-center mb-4">Check off steps as you complete them.</p>
-          <ul className="space-y-6 mb-10 pl-2">
-            {recipe.instructions.map((instruction: string, index: number) => (
-              <li key={index} className="py-1 mb-3 flex items-start gap-4">
-                <input 
-                  type="checkbox" 
-                  id={`${recipeId}-instruction-${index}`}
-                  checked={isIngredientChecked(`instruction-${index}`)}
-                  onChange={() => toggleIngredient(`instruction-${index}`)}
-                  className="mt-1 h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 flex-shrink-0"
-                />
-                <label 
-                  htmlFor={`${recipeId}-instruction-${index}`}
-                  className="flex-grow cursor-pointer"
-                >
-                  {instruction}
-                </label>
-              </li>
-            ))}
-          </ul>
-          
-          {/* Divider before Notes section */}
-          <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-          
-          {/* Notes */}
-          {recipe.notes && (
-            <>
-              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Notes</h2>
-              <div className="text-gray-300 mb-3">
-                {Array.isArray(recipe.notes) ? (
-                  <ul className="space-y-3">
-                    {recipe.notes.map((note: string, index: number) => (
-                      <li key={index} className="py-1 mb-1">{note}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>{recipe.notes}</p>
-                )}
-              </div>
-            </>
-          )}
-          
-          {/* Other optional sections */}
-          
-          {recipe.nutrition && (
-            <>
-              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Nutritional Information</h2>
-              <ul className="space-y-3 mb-8">
-                {recipe.nutrition.map((item: string, index: number) => (
-                  <li key={index} className="py-1 mb-1">{item}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          
-          {recipe.storage && (
-            <>
-              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Storage Instructions</h2>
-              <ul className="space-y-3 mb-8">
-                {recipe.storage.map((item: string, index: number) => (
-                  <li key={index} className="py-1 mb-1">{item}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          
-          {recipe.reheating && (
-            <>
-              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Reheating Instructions</h2>
-              <ul className="space-y-3 mb-8">
-                {recipe.reheating.map((item: string, index: number) => (
-                  <li key={index} className="py-1 mb-1">{item}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          
-          {recipe.makeAhead && (
-            <>
-              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Make Ahead Tips</h2>
-              <ul className="space-y-3 mb-8">
-                {recipe.makeAhead.map((item: string, index: number) => (
-                  <li key={index} className="py-1 mb-1">{item}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          
-          {recipe.dietaryInfo && (
-            <>
-              <div className="border-t border-gray-700 pt-8 mt-8 mb-8"></div>
-              <h2 className="text-2xl font-bold text-blue-400 mb-5 text-center">Dietary Information</h2>
-              <ul className="space-y-3 mb-8">
-                {recipe.dietaryInfo.map((item: string, index: number) => (
-                  <li key={index} className="py-1 mb-1">{item}</li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-        
-        {url && (
-          <div className="mt-4 pt-4 border-t border-gray-700">
-            <a 
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 text-sm"
-            >
-              View Original Recipe
-            </a>
-          </div>
-        )}
-        
-        {/* Shopping List Modal */}
-        {showShoppingList && (
-          <GroceryList 
-            ingredients={extractIngredients()} 
-            recipeName={typeof recipe === 'string' 
-              ? ((recipe as string).match(/# (.+)$/m)?.[1] || 'Recipe')
-              : (recipe as any).title || 'Recipe'} 
-            onClose={() => setShowShoppingList(false)} 
-          />
-        )}
-      </div>
     </div>
-  );
+  ); 
 }
 
 // Move the LoginPrompt component outside of the main component
