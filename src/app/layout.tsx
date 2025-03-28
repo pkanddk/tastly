@@ -69,6 +69,9 @@ export default function RootLayout({
       <head>
         <link rel="apple-touch-icon" href="/apple-icon.jpg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Tastly" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
       </head>

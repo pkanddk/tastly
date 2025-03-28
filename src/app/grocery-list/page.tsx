@@ -21,10 +21,12 @@ export default function GroceryListPage() {
   };
 
   return (
-    <GroceryList
-      ingredients={currentIngredients}
-      recipeName={currentRecipeName}
-      onClose={handleClose}
-    />
+    <div className="pt-[52px]">
+      <GroceryList
+        ingredients={currentIngredients}
+        recipeName={currentRecipeName}
+        onClose={handleClose}
+      />
+    </div>
   );
 } 
