@@ -16,8 +16,18 @@ export default function GroceryListPage() {
     }
   }, [router]);
 
+  // Prevent body scrolling on mobile
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = 'auto';
+      };
+    }
+  }, []);
+
   return (
-    <div className="container mx-auto px-4">
+    <div className="fixed inset-0 bg-gray-900">
       <GroceryList
         ingredients={currentIngredients}
         recipeName={currentRecipeName}

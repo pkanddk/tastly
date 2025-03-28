@@ -675,207 +675,185 @@ const GroceryList: React.FC<GroceryListProps> = ({
   };
 
   return (
-    <div className={`${isPage ? 'min-h-screen pt-[52px]' : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50'}`}>
-      <div className={`${isPage ? 'w-full h-full bg-gray-900' : 'w-full max-w-lg max-h-[90vh] overflow-y-auto bg-gray-900 rounded-lg shadow-xl'}`}>
-        <div className="p-4">
-          {!isPage && onClose && (
-            <button
-              onClick={onClose}
-              className="absolute top-2 right-2 text-gray-400 hover:text-white"
-              aria-label="Close grocery list"
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+    <div 
+      className={`${
+        isPage 
+          ? 'min-h-screen bg-gray-900' 
+          : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50'
+      }`}
+      style={isPage ? {} : { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+    >
+      <div 
+        className={`${
+          isPage 
+            ? 'w-full min-h-screen pt-[52px]' 
+            : 'relative w-full max-w-lg max-h-[90vh] bg-gray-900 rounded-lg shadow-xl'
+        }`}
+      >
+        <div className={`${isPage ? 'p-4' : 'p-6'}`}>
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">Grocery List</h2>
-          </div>
-
-          {/* Recipe tabs with X buttons - Make horizontally scrollable on mobile */}
-          <div className="relative mb-4 -mx-6 px-6">
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              {/* All Items tab is always present */}
+            {!isPage && onClose && (
               <button
-                onClick={() => setActiveTab('all')}
-                className={`px-4 py-2 rounded-lg flex-shrink-0 ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                onClick={onClose}
+                className="text-gray-400 hover:text-white p-2"
+                aria-label="Close grocery list"
               >
-                All Items
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
-              
-              {/* Visible recipe tabs */}
-              {visibleRecipes.map(recipe => (
-                <div key={recipe.id} className="flex-shrink-0 relative">
-                  <button
-                    onClick={() => setActiveTab(recipe.id)}
-                    className={`px-4 pr-8 py-2 rounded-lg whitespace-nowrap overflow-hidden ${activeTab === recipe.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-                    style={{ maxWidth: '180px', textOverflow: 'ellipsis' }}
-                  >
-                    {recipe.name}
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation(); // Prevent triggering the tab button click
-                      removeRecipe(recipe.id);
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                    aria-label={`Remove ${recipe.name}`}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-
-              {/* More button if there are additional recipes */}
-              {hasMoreRecipes && (
+            )}
+          </div>
+          
+          <div className={`${isPage ? 'pb-20' : 'overflow-y-auto max-h-[calc(90vh-10rem)]'}`}>
+            {/* Recipe tabs with X buttons - Make horizontally scrollable on mobile */}
+            <div className="relative mb-4 -mx-6 px-6">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {/* All Items tab is always present */}
                 <button
-                  onClick={() => setShowAllRecipes(!showAllRecipes)}
-                  className="px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 flex items-center gap-2"
+                  onClick={() => setActiveTab('all')}
+                  className={`px-4 py-2 rounded-lg flex-shrink-0 ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
                 >
-                  {showAllRecipes ? (
-                    <>
-                      Show Less
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                      </svg>
-                    </>
-                  ) : (
-                    <>
-                      More Recipes
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </>
-                  )}
+                  All Items
                 </button>
-              )}
+                
+                {/* Visible recipe tabs */}
+                {visibleRecipes.map(recipe => (
+                  <div key={recipe.id} className="flex-shrink-0 relative">
+                    <button
+                      onClick={() => setActiveTab(recipe.id)}
+                      className={`px-4 pr-8 py-2 rounded-lg whitespace-nowrap overflow-hidden ${activeTab === recipe.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                      style={{ maxWidth: '180px', textOverflow: 'ellipsis' }}
+                    >
+                      {recipe.name}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent triggering the tab button click
+                        removeRecipe(recipe.id);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                      aria-label={`Remove ${recipe.name}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+
+                {/* More button if there are additional recipes */}
+                {hasMoreRecipes && (
+                  <button
+                    onClick={() => setShowAllRecipes(!showAllRecipes)}
+                    className="px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 flex items-center gap-2"
+                  >
+                    {showAllRecipes ? (
+                      <>
+                        Show Less
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </>
+                    ) : (
+                      <>
+                        More Recipes
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={removeCheckedItems}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Remove Checked
-            </button>
-            <button
-              onClick={handleClearAll}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Clear All
-            </button>
-          </div>
+            {/* Action buttons */}
+            <div className="flex gap-2 mb-6">
+              <button
+                onClick={removeCheckedItems}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Remove Checked
+              </button>
+              <button
+                onClick={handleClearAll}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Clear All
+              </button>
+            </div>
 
-          {/* Add custom item form */}
-          <div className="bg-gray-800 rounded-lg p-4 mb-6">
-            <h3 className="text-xl text-blue-400 mb-4">Add Custom Item</h3>
-            
-            <form ref={formRef} onSubmit={(e) => { e.preventDefault(); addCustomItem(); }} className="space-y-4">
-              <div className="flex flex-col md:flex-row gap-3">
-                <div className="relative flex-grow">
-                  <input 
+            {/* Add custom item form */}
+            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+              <h3 className="text-xl text-blue-400 mb-4">Add Custom Item</h3>
+              
+              <form ref={formRef} onSubmit={(e) => { e.preventDefault(); addCustomItem(); }} className="space-y-4">
+                <div className="flex flex-col md:flex-row gap-3">
+                  <div className="relative flex-grow">
+                    <input 
+                      type="text"
+                      value={newItem.name}
+                      onChange={handleInputChange}
+                      placeholder="Item name"
+                      className="bg-gray-900 text-white rounded-lg p-3 w-full"
+                      required
+                    />
+                    {showSuggestions && suggestions.length > 0 && (
+                      <ul className="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                        {suggestions.map((suggestion, index) => (
+                          <li
+                            key={index}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white"
+                          >
+                            {suggestion}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  
+                  <input
                     type="text"
-                    value={newItem.name}
-                    onChange={handleInputChange}
-                    placeholder="Item name"
-                    className="bg-gray-900 text-white rounded-lg p-3 w-full"
-                    required
+                    value={newItem.quantity}
+                    onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                    placeholder="Quantity"
+                    className="bg-gray-900 text-white rounded-lg p-3 w-full md:w-auto"
                   />
-                  {showSuggestions && suggestions.length > 0 && (
-                    <ul className="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
-                      {suggestions.map((suggestion, index) => (
-                        <li
-                          key={index}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                          className="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white"
-                        >
-                          {suggestion}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
                 
-                <input
-                  type="text"
-                  value={newItem.quantity}
-                  onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-                  placeholder="Quantity"
-                  className="bg-gray-900 text-white rounded-lg p-3 w-full md:w-auto"
-                />
-              </div>
-              
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors"
-              >
-                Add Item
-              </button>
-            </form>
-          </div>
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors"
+                >
+                  Add Item
+                </button>
+              </form>
+            </div>
 
-          {/* Display grocery items based on active tab */}
-          {activeTab === 'all' ? (
-            // Show all items grouped by section
-            <>
-              {Object.entries(getItemsBySection()).map(([section, items]) => (
-                <div key={section} className="mb-8">
-                  <h3 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h3>
-                  <ul className="space-y-2">
-                    {items.map(item => (
-                      <li key={item.id} className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
-                        <div className="flex items-center">
-                          <input 
-                            type="checkbox" 
-                            checked={item.isChecked}
-                            onChange={() => toggleItemCheck(item.id, item.recipeId)}
-                            className="h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 mr-3"
-                          />
-                          <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-white'}`}>
-                            {item.name} {item.quantity ? `(${item.quantity})` : ''}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => removeGroceryItem(item.id, item.recipeId)}
-                          className="text-red-500 hover:text-red-400"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </>
-          ) : (
-            // Show recipe-specific view
-            recipes.find(r => r.id === activeTab) && (
-              <div key={activeTab} className="recipe-list">
-                {/* Group ingredients by section */}
-                {Object.entries(organizeRecipeItemsBySection(activeTab)).map(([section, items]) => (
-                  <div key={section} className="mb-6">
-                    <h4 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h4>
+            {/* Display grocery items based on active tab */}
+            {activeTab === 'all' ? (
+              // Show all items grouped by section
+              <>
+                {Object.entries(getItemsBySection()).map(([section, items]) => (
+                  <div key={section} className="mb-8">
+                    <h3 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h3>
                     <ul className="space-y-2">
                       {items.map(item => (
                         <li key={item.id} className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
                           <div className="flex items-center">
-                            <input
-                              type="checkbox"
+                            <input 
+                              type="checkbox" 
                               checked={item.isChecked}
-                              onChange={() => toggleItemCheck(item.id, activeTab)}
+                              onChange={() => toggleItemCheck(item.id, item.recipeId)}
                               className="h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 mr-3"
                             />
                             <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-white'}`}>
@@ -883,7 +861,7 @@ const GroceryList: React.FC<GroceryListProps> = ({
                             </span>
                           </div>
                           <button
-                            onClick={() => removeGroceryItem(item.id, activeTab)}
+                            onClick={() => removeGroceryItem(item.id, item.recipeId)}
                             className="text-red-500 hover:text-red-400"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -895,33 +873,70 @@ const GroceryList: React.FC<GroceryListProps> = ({
                     </ul>
                   </div>
                 ))}
-              </div>
-            )
-          )}
+              </>
+            ) : (
+              // Show recipe-specific view
+              recipes.find(r => r.id === activeTab) && (
+                <div key={activeTab} className="recipe-list">
+                  {/* Group ingredients by section */}
+                  {Object.entries(organizeRecipeItemsBySection(activeTab)).map(([section, items]) => (
+                    <div key={section} className="mb-6">
+                      <h4 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h4>
+                      <ul className="space-y-2">
+                        {items.map(item => (
+                          <li key={item.id} className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={item.isChecked}
+                                onChange={() => toggleItemCheck(item.id, activeTab)}
+                                className="h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 mr-3"
+                              />
+                              <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-white'}`}>
+                                {item.name} {item.quantity ? `(${item.quantity})` : ''}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => removeGroceryItem(item.id, activeTab)}
+                              className="text-red-500 hover:text-red-400"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
 
-          {/* Clear confirmation modal */}
-          {showClearConfirmation && (
-            <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
-              <div className="bg-gray-900 rounded-xl max-w-md w-full p-6">
-                <h3 className="text-xl font-bold text-white mb-4">Clear All Items?</h3>
-                <p className="text-gray-300 mb-6">This will remove all items from your grocery list. This action cannot be undone.</p>
-                <div className="flex justify-end gap-4">
-                  <button
-                    onClick={cancelClearAll}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmClearAll}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
-                  >
-                    Clear All
-                  </button>
+            {/* Clear confirmation modal */}
+            {showClearConfirmation && (
+              <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+                <div className="bg-gray-900 rounded-xl max-w-md w-full p-6">
+                  <h3 className="text-xl font-bold text-white mb-4">Clear All Items?</h3>
+                  <p className="text-gray-300 mb-6">This will remove all items from your grocery list. This action cannot be undone.</p>
+                  <div className="flex justify-end gap-4">
+                    <button
+                      onClick={cancelClearAll}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={confirmClearAll}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                    >
+                      Clear All
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
