@@ -640,8 +640,8 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
       <div className="bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
+        <div className="p-6 pt-8 md:pt-6">
+          <div className="flex justify-between items-center mb-6 mt-2 md:mt-0">
             <h2 className="text-2xl font-bold text-white">Grocery List</h2>
             <button
               onClick={onClose}
