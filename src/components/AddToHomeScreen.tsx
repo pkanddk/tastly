@@ -37,7 +37,7 @@ export default function AddToHomeScreen() {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 bg-blue-600 text-white p-4 rounded-lg shadow-lg z-50 animate-fade-in">
+    <div className="fixed bottom-4 left-4 right-4 bg-purple-600 text-white p-4 rounded-lg shadow-lg z-50 animate-fade-in">
       <div className="flex items-start justify-between">
         <div className="flex-1 mr-4">
           <h3 className="font-bold text-lg mb-1">Add to Home Screen</h3>
