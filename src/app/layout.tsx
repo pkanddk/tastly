@@ -6,6 +6,7 @@ import { Metadata } from 'next'
 import WelcomeBar from '@/components/WelcomeBar'
 import Footer from '@/components/Footer'
 import Script from 'next/script'
+import AddToHomeScreen from '@/components/AddToHomeScreen'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -76,6 +77,7 @@ export default function RootLayout({
               {children}
             </main>
             <Footer />
+            <AddToHomeScreen />
           </GroceryListProvider>
         </AuthProvider>
         
