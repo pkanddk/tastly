@@ -16,16 +16,12 @@ export default function GroceryListPage() {
     }
   }, [router]);
 
-  const handleClose = () => {
-    router.back();
-  };
-
   return (
-    <div className="pt-[52px]">
+    <div className="container mx-auto px-4">
       <GroceryList
         ingredients={currentIngredients}
         recipeName={currentRecipeName}
-        onClose={handleClose}
+        isPage={true}
       />
     </div>
   );

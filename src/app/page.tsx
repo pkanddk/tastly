@@ -74,7 +74,7 @@ export default function HomePage() {
   };
   
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16 pt-[68px]">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
       <div className="text-center mb-6">
         <h1 className="text-4xl sm:text-5xl font-bold mb-3">Welcome to Tastly</h1>
         <p className="text-xl text-blue-400 max-w-3xl mx-auto">

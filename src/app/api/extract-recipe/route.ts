@@ -44,7 +44,13 @@ export async function POST(req: NextRequest) {
 Always include these sections in this exact order:
 
 1. Title with a single # (main heading)
-2. Ingredients section with bullet points - IMPORTANT: Format ALL ingredient categories using ### prefix, like "### Cheese Filling:" or "### Meat Sauce:" (omit phrases like "For the" when possible)
+2. Ingredients section with bullet points - IMPORTANT:
+   - Format ALL ingredient categories using ### prefix, like "### Cheese Filling:" or "### Meat Sauce:" (omit phrases like "For the" when possible)
+   - Format ingredient names consistently:
+     - Capitalize the first letter of each word
+     - Remove unnecessary qualifiers like "fresh", "whole", "raw" unless they're essential (e.g., keep "Fresh Mozzarella" as it's different from regular mozzarella)
+     - Use simple, clear ingredient names (e.g., "Mozzarella Cheese" instead of "Fresh Whole Milk Mozzarella Cheese")
+     - Keep essential qualifiers that affect the recipe (e.g., "Whole Milk" vs "Skim Milk")
 3. Instructions section with numbered steps
 4. Cooking Time and Servings section
 5. Notes section for tips and variations

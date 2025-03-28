@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocalStorage } from '../lib/hooks/useLocalStorage';
-import { standardizeIngredients } from '@/lib/utils/ingredientUtils';
+import { standardizeIngredients } from '@/app/lib/utils/ingredientUtils';
 
 interface GroceryItem {
   id: string;
@@ -21,10 +21,16 @@ interface Recipe {
 interface GroceryListProps {
   ingredients?: string[];
   recipeName?: string;
-  onClose: () => void;
+  onClose?: () => void;
+  isPage?: boolean;
 }
 
-const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName = '', onClose }) => {
+const GroceryList: React.FC<GroceryListProps> = ({ 
+  ingredients = [], 
+  recipeName = '', 
+  onClose,
+  isPage = false 
+}) => {
   // State for recipes and custom items
   const [recipes, setRecipes] = useLocalStorage<Recipe[]>('recipes', []);
   const [customItems, setCustomItems] = useLocalStorage<GroceryItem[]>('customItems', []);
@@ -642,20 +648,22 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
   const hasMoreRecipes = recipes.length > MAX_VISIBLE_RECIPES;
 
   return (
-    <div className="md:fixed md:inset-0 md:bg-black md:bg-opacity-80 md:flex md:items-center md:justify-center md:p-4 md:z-50 fixed inset-0 bg-gray-900 z-[9999] md:bg-transparent">
-      <div className="md:bg-gray-900 md:rounded-xl md:max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto pt-[52px] md:pt-0">
-        <div className="p-6 pt-8 md:pt-6">
-          <div className="flex justify-between items-center mb-6 mt-2 md:mt-0 sticky top-0 bg-gray-900 z-10 pb-4">
-            <h2 className="text-2xl font-bold text-white">Grocery List</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white p-2 -mr-2"
-              aria-label="Close grocery list"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+    <div className={`${isPage ? 'h-full' : 'md:fixed md:inset-0 md:bg-black md:bg-opacity-80 md:flex md:items-center md:justify-center md:p-4 md:z-50 fixed inset-0 bg-gray-900 z-[9999] md:bg-transparent'}`}>
+      <div className={`${isPage ? 'w-full' : 'md:bg-gray-900 md:rounded-xl md:max-w-2xl w-full h-full md:h-auto md:max-h-[90vh]'} overflow-y-auto`}>
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Grocery List</h2>
+            {!isPage && onClose && (
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="Close grocery list"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Recipe tabs with X buttons - Make horizontally scrollable on mobile */}

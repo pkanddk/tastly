@@ -75,11 +75,11 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
       </head>
-      <body className={`${inter.className} min-h-screen`}>
+      <body className={`${inter.className} min-h-screen bg-gray-900`}>
         <AuthProvider>
           <GroceryListProvider>
             <WelcomeBar />
-            <main>
+            <main className="pt-[68px]">
               {children}
             </main>
             <Footer />
