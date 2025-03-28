@@ -24,8 +24,8 @@ export default function WelcomeBar() {
   
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 w-full z-50 h-[52px]">
-        <div className="bg-[#10131a] border-b border-gray-800 shadow-md h-full">
+      <header className="fixed top-0 left-0 right-0 w-full z-[9999] h-[52px] backdrop-blur-md">
+        <div className="bg-[#10131a]/95 border-b border-gray-800 shadow-md h-full">
           <div className="h-full flex justify-between items-center px-4">
             {/* Menu button and welcome message or logo */}
             <div className="flex items-center">

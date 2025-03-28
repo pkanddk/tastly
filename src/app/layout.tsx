@@ -28,9 +28,22 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Tastly'
+    title: 'Tastly',
+    startupImage: [
+      '/apple-splash-2048-2732.jpg',
+      '/apple-splash-1668-2388.jpg',
+      '/apple-splash-1536-2048.jpg',
+      '/apple-splash-1125-2436.jpg',
+      '/apple-splash-1242-2688.jpg',
+    ]
   },
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover'
+  },
   themeColor: '#10131a',
 }
 
@@ -38,6 +51,8 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: '#10131a',
+  viewportFit: 'cover',
+  userScalable: false
 }
 
 export default function RootLayout({
