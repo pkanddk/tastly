@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocalStorage } from '../lib/hooks/useLocalStorage';
+import { standardizeIngredients } from '@/lib/utils/ingredientUtils';
 
 interface GroceryItem {
   id: string;
@@ -248,14 +249,17 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
   const addCustomItem = () => {
     if (newItem.name.trim() === '') return;
     
+    // Standardize the item name
+    const standardizedName = standardizeIngredients([newItem.name])[0];
+    
     // Determine the section automatically based on the item name
-    const section = determineSection(newItem.name);
+    const section = determineSection(standardizedName);
     
     setCustomItems([
       ...customItems,
       {
         id: `custom-${Date.now().toString()}`,
-        name: newItem.name,
+        name: standardizedName,
         quantity: newItem.quantity || '1',
         section,
         isChecked: false,
@@ -638,8 +642,8 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
   const hasMoreRecipes = recipes.length > MAX_VISIBLE_RECIPES;
 
   return (
-    <div className="md:fixed md:inset-0 md:bg-black md:bg-opacity-80 md:flex md:items-center md:justify-center md:p-4 md:z-50 fixed inset-0 bg-gray-900 z-[100] md:bg-transparent">
-      <div className="md:bg-gray-900 md:rounded-xl md:max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto">
+    <div className="md:fixed md:inset-0 md:bg-black md:bg-opacity-80 md:flex md:items-center md:justify-center md:p-4 md:z-50 fixed inset-0 bg-gray-900 z-[9999] md:bg-transparent">
+      <div className="md:bg-gray-900 md:rounded-xl md:max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto pt-[52px] md:pt-0">
         <div className="p-6 pt-8 md:pt-6">
           <div className="flex justify-between items-center mb-6 mt-2 md:mt-0 sticky top-0 bg-gray-900 z-10 pb-4">
             <h2 className="text-2xl font-bold text-white">Grocery List</h2>
