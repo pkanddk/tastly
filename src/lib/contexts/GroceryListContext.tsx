@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import GroceryList from '@/components/GroceryList';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface GroceryListContextType {
   isOpen: boolean;
@@ -27,9 +28,32 @@ export const GroceryListProvider: React.FC<{children: React.ReactNode}> = ({ chi
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [currentIngredients, setCurrentIngredients] = useState<string[]>([]);
   const [currentRecipeName, setCurrentRecipeName] = useState<string>('');
+  const pathname = usePathname();
+  const router = useRouter();
 
-  const openGroceryList = () => setIsOpen(true);
-  const closeGroceryList = () => setIsOpen(false);
+  // Close grocery list when route changes
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
+
+  const openGroceryList = () => {
+    // On mobile, use URL state to handle the grocery list
+    if (window.innerWidth < 768) {
+      document.body.style.overflow = 'hidden';
+      router.push('/grocery-list');
+    } else {
+      setIsOpen(true);
+    }
+  };
+
+  const closeGroceryList = () => {
+    document.body.style.overflow = '';
+    if (window.innerWidth < 768) {
+      router.back();
+    } else {
+      setIsOpen(false);
+    }
+  };
   
   const addRecipeToGroceryList = (ingredients: string[], recipeName: string) => {
     setCurrentIngredients(ingredients);

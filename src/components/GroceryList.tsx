@@ -638,14 +638,15 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
   const hasMoreRecipes = recipes.length > MAX_VISIBLE_RECIPES;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="md:fixed md:inset-0 md:bg-black md:bg-opacity-80 md:flex md:items-center md:justify-center md:p-4 md:z-50 fixed inset-0 bg-gray-900 z-[100] md:bg-transparent">
+      <div className="md:bg-gray-900 md:rounded-xl md:max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto">
         <div className="p-6 pt-8 md:pt-6">
-          <div className="flex justify-between items-center mb-6 mt-2 md:mt-0">
+          <div className="flex justify-between items-center mb-6 mt-2 md:mt-0 sticky top-0 bg-gray-900 z-10 pb-4">
             <h2 className="text-2xl font-bold text-white">Grocery List</h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white"
+              className="text-gray-400 hover:text-white p-2 -mr-2"
+              aria-label="Close grocery list"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -653,9 +654,9 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
             </button>
           </div>
 
-          <div className="relative mb-4">
-            {/* Recipe tabs with X buttons */}
-            <div className="flex flex-wrap gap-2">
+          {/* Recipe tabs with X buttons - Make horizontally scrollable on mobile */}
+          <div className="relative mb-4 -mx-6 px-6">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               {/* All Items tab is always present */}
               <button
                 onClick={() => setActiveTab('all')}
