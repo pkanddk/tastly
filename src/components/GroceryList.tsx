@@ -647,23 +647,50 @@ const GroceryList: React.FC<GroceryListProps> = ({
   // Check if we have more recipes to show
   const hasMoreRecipes = recipes.length > MAX_VISIBLE_RECIPES;
 
-  return (
-    <div className={`${isPage ? 'h-full' : 'md:fixed md:inset-0 md:bg-black md:bg-opacity-80 md:flex md:items-center md:justify-center md:p-4 md:z-50 fixed inset-0 bg-gray-900 z-[9999] md:bg-transparent'}`}>
-      <div className={`${isPage ? 'w-full' : 'md:bg-gray-900 md:rounded-xl md:max-w-2xl w-full h-full md:h-auto md:max-h-[90vh]'} overflow-y-auto`}>
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Grocery List</h2>
-            {!isPage && onClose && (
+  const renderRecipeList = () => {
+    return (
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Recipes</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {recipes.map(recipe => (
+            <div
+              key={recipe.id}
+              className="flex items-center justify-between bg-gray-800 p-3 rounded-lg"
+            >
+              <span className="text-sm font-medium truncate flex-1">{recipe.name}</span>
               <button
-                onClick={onClose}
-                className="text-gray-400 hover:text-white transition-colors"
-                aria-label="Close grocery list"
+                onClick={() => removeRecipe(recipe.id)}
+                className="ml-2 text-red-400 hover:text-red-300"
+                aria-label={`Remove ${recipe.name}`}
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
-            )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className={`${isPage ? 'min-h-screen pt-[52px]' : 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50'}`}>
+      <div className={`${isPage ? 'w-full h-full bg-gray-900' : 'w-full max-w-lg max-h-[90vh] overflow-y-auto bg-gray-900 rounded-lg shadow-xl'}`}>
+        <div className="p-4">
+          {!isPage && onClose && (
+            <button
+              onClick={onClose}
+              className="absolute top-2 right-2 text-gray-400 hover:text-white"
+              aria-label="Close grocery list"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">Grocery List</h2>
           </div>
 
           {/* Recipe tabs with X buttons - Make horizontally scrollable on mobile */}

@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useGroceryList } from '@/app/lib/contexts/GroceryListContext';
 import { useIngredientChecklist } from '@/lib/hooks/useIngredientChecklist';
@@ -7,6 +7,7 @@ import { saveRecipe, signInWithGoogle, checkIfRecipeSaved } from '@/lib/firebase
 import { END_MESSAGES } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import GroceryList from './GroceryList';
+import debounce from 'lodash/debounce';
 
 interface RecipeDisplayProps {
   recipe: string | {
@@ -121,8 +122,41 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
     }
   }, [checkedIngredients, recipeId]);
   
-  // Handle ingredient checkbox changes
-  const handleIngredientCheck = (ingredient: string, checked: boolean) => {
+  // Memoize expensive computations
+  const processedRecipe = useMemo(() => {
+    if (typeof recipe === 'string') {
+      return {
+        content: recipe,
+        ingredients: extractIngredients(),
+        title: recipe.match(/# (.+)$/m)?.[1] || ''
+      };
+    }
+    return {
+      content: recipe.markdown,
+      ingredients: recipe.ingredients,
+      title: recipe.title
+    };
+  }, [recipe]);
+  
+  // Debounce localStorage operations
+  const debouncedSaveToStorage = useCallback(
+    debounce((items: Set<string>) => {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(
+            recipeId,
+            JSON.stringify(Array.from(items))
+          );
+        } catch (error) {
+          console.error('Error saving grocery list:', error);
+        }
+      }
+    }, 1000),
+    [recipeId]
+  );
+  
+  // Handle ingredient checkbox changes with debounced storage
+  const handleIngredientCheck = useCallback((ingredient: string, checked: boolean) => {
     setCheckedIngredients(prev => {
       const newChecked = new Set(prev);
       if (checked) {
@@ -130,9 +164,10 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       } else {
         newChecked.delete(ingredient);
       }
+      debouncedSaveToStorage(newChecked);
       return newChecked;
     });
-  };
+  }, [debouncedSaveToStorage]);
   
   // Clean up old grocery lists (older than 7 days)
   useEffect(() => {
