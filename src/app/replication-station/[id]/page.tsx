@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { doc, getDoc, addDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useGroceryList } from '@/lib/contexts/GroceryListContext';
+import { useGroceryList } from '@/app/lib/contexts/GroceryListContext';
 import RecipeDisplay from '@/components/RecipeDisplay';
 import { DEFAULT_RECIPE_IMAGE, saveRecipe, checkIfRecipeSaved } from '@/lib/firebase/firebaseUtils';
 import GroceryList from '@/components/GroceryList';

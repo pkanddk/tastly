@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { useGroceryList } from '@/lib/contexts/GroceryListContext';
+import { useGroceryList } from '@/app/lib/contexts/GroceryListContext';
 import { useIngredientChecklist } from '@/lib/hooks/useIngredientChecklist';
 import { saveRecipe, signInWithGoogle, checkIfRecipeSaved } from '@/lib/firebase/firebaseUtils';
 import { END_MESSAGES } from '@/lib/constants';

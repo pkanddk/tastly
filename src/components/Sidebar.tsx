@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { HomeIcon, DocumentTextIcon, BookOpenIcon, BeakerIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
-import { useGroceryList } from '@/lib/contexts/GroceryListContext';
+import { useGroceryList } from '@/app/lib/contexts/GroceryListContext';
 import { signInWithGoogle } from '@/lib/firebase/firebaseUtils';
 
 // Navigation items definition

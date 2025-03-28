@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import GroceryList from '@/components/GroceryList';
-import { useGroceryList } from '@/lib/contexts/GroceryListContext';
+import { useGroceryList } from '@/app/lib/contexts/GroceryListContext';
 
 export default function GroceryListPage() {
   const router = useRouter();

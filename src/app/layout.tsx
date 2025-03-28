@@ -1,7 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/lib/contexts/AuthContext'
-import { GroceryListProvider } from '@/lib/contexts/GroceryListContext'
+import { GroceryListProvider } from '@/app/lib/contexts/GroceryListContext'
 import { Metadata } from 'next'
 import WelcomeBar from '@/components/WelcomeBar'
 import Footer from '@/components/Footer'

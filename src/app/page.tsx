@@ -10,7 +10,7 @@ import { TAGLINES } from '@/lib/constants';
 import TaglineIcon from '@/components/TaglineIcon';
 import RecipeDisplay from '@/components/RecipeDisplay';
 import { DEFAULT_RECIPE_IMAGE } from '@/lib/firebase/firebaseUtils';
-import { useGroceryList } from '@/lib/contexts/GroceryListContext';
+import { useGroceryList } from '@/app/lib/contexts/GroceryListContext';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
@@ -74,7 +74,7 @@ export default function HomePage() {
   };
   
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-16 pt-[68px]">
       <div className="text-center mb-6">
         <h1 className="text-4xl sm:text-5xl font-bold mb-3">Welcome to Tastly</h1>
         <p className="text-xl text-blue-400 max-w-3xl mx-auto">
