@@ -11,6 +11,7 @@ import { signInWithGoogle } from '@/lib/firebase/firebaseUtils';
 // Navigation items definition
 const NAV_ITEMS = [
   { href: '/', icon: HomeIcon, label: 'Home' },
+  { href: '#', icon: ShoppingCartIcon, label: 'Grocery List', onClick: (onClose: () => void, openGroceryList: () => void) => { openGroceryList(); onClose(); } },
   { href: '/my-recipes', icon: BookOpenIcon, label: 'My Recipes' },
   { href: '/replication-station', icon: BeakerIcon, label: 'Replication Station' }
 ];
@@ -100,31 +101,31 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
               <nav className="space-y-1 flex-grow">
                 {NAV_ITEMS.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
-                      pathname === item.href
-                        ? "bg-blue-600 text-white"
-                        : "text-gray-300 hover:text-white hover:bg-gray-800"
-                    }`}
-                    onClick={onClose}
-                  >
-                    <item.icon className="h-5 w-5 mr-3" />
-                    <span>{item.label}</span>
-                  </Link>
+                  item.onClick ? (
+                    <button
+                      key={item.href}
+                      onClick={() => item.onClick(onClose, openGroceryList)}
+                      className="w-full flex items-center px-3 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                    >
+                      <item.icon className="h-5 w-5 mr-3" />
+                      <span>{item.label}</span>
+                    </button>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
+                        pathname === item.href
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-300 hover:text-white hover:bg-gray-800"
+                      }`}
+                      onClick={onClose}
+                    >
+                      <item.icon className="h-5 w-5 mr-3" />
+                      <span>{item.label}</span>
+                    </Link>
+                  )
                 ))}
-                
-                <button 
-                  onClick={() => {
-                    openGroceryList();
-                    onClose();
-                  }}
-                  className="w-full flex items-center px-3 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
-                >
-                  <ShoppingCartIcon className="h-5 w-5 mr-3" />
-                  <span>Grocery List</span>
-                </button>
               </nav>
 
               {/* Empty flex-grow div to push sign out to bottom */}
@@ -163,19 +164,30 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <div className="pt-6 mt-2 border-t border-gray-800">
                   <nav className="space-y-1">
                     {NAV_ITEMS.map((item) => (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
-                          pathname === item.href
-                            ? "bg-blue-600 text-white"
-                            : "text-gray-300 hover:text-white hover:bg-gray-800"
-                        }`}
-                        onClick={onClose}
-                      >
-                        <item.icon className="h-5 w-5 mr-3" />
-                        <span>{item.label}</span>
-                      </Link>
+                      item.onClick ? (
+                        <button
+                          key={item.href}
+                          onClick={() => item.onClick(onClose, openGroceryList)}
+                          className="w-full flex items-center px-3 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors"
+                        >
+                          <item.icon className="h-5 w-5 mr-3" />
+                          <span>{item.label}</span>
+                        </button>
+                      ) : (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
+                            pathname === item.href
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-300 hover:text-white hover:bg-gray-800"
+                          }`}
+                          onClick={onClose}
+                        >
+                          <item.icon className="h-5 w-5 mr-3" />
+                          <span>{item.label}</span>
+                        </Link>
+                      )
                     ))}
                   </nav>
                 </div>
