@@ -205,7 +205,7 @@ export default function RecipeExtractorClient() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6 text-center">Recipe Extractor</h1>
+      <h1 className="text-2xl font-bold mb-6 text-center">Recipe Reader</h1>
       
       <form onSubmit={handleSubmit} className="w-full mx-auto">
         <div className="flex flex-col sm:flex-row gap-4">

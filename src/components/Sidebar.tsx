@@ -11,7 +11,6 @@ import { signInWithGoogle } from '@/lib/firebase/firebaseUtils';
 // Navigation items definition
 const NAV_ITEMS = [
   { href: '/', icon: HomeIcon, label: 'Home' },
-  { href: '/recipe-extractor', icon: DocumentTextIcon, label: 'Recipe Extractor' },
   { href: '/my-recipes', icon: BookOpenIcon, label: 'My Recipes' },
   { href: '/replication-station', icon: BeakerIcon, label: 'Replication Station' }
 ];

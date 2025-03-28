@@ -40,7 +40,7 @@ function LoadingState() {
         </div>
 
         <div className="text-center">
-          <p className="text-white text-lg mb-4">Extracting recipe...</p>
+          <p className="text-white text-lg mb-4">Reading recipe...</p>
           <div className="inline-flex items-center justify-center gap-2 text-blue-400 animate-fade-in transition-all duration-500 ease-in-out hover:scale-105">
             <span className="w-5 h-5 flex-shrink-0">
               <TaglineIcon icon={TAGLINES[taglineIndex].icon} />

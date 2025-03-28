@@ -290,7 +290,7 @@ export default function RecipeExtractor() {
         <div className="flex flex-col items-center justify-center p-8">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
           <div className="text-center">
-            <p className="text-gray-300 mb-2">Extracting recipe...</p>
+            <p className="text-gray-300 mb-2">Reading recipe...</p>
             <p className="text-blue-400 transition-opacity duration-500">
               {TAGLINES[currentTaglineIndex].text}
             </p>

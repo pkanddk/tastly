@@ -62,7 +62,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   
   // Add state for unit system preference
-  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric');
+  const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('imperial');
    
   // Add state for grocery list view mode
   const [groceryListMode, setGroceryListMode] = useState<'all' | 'sections'>('all');
@@ -528,7 +528,7 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
   };
 
   // Function to share recipe
-  const handleShareRecipe = () => {
+  const handleShareRecipe = async () => {
     const title = typeof recipe === 'string' 
       ? (recipe.match(/# (.+?)(\n|$)/)?.[1] || 'Recipe')
       : recipe.title;
@@ -546,6 +546,43 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
     } else {
       navigator.clipboard.writeText(window.location.href);
       alert('Recipe link copied to clipboard!');
+    }
+  };
+  
+  const handleSaveRecipe = async () => {
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+    
+    if (isAlreadySaved) {
+      return; // Already saved, do nothing
+    }
+    
+    try {
+      setIsSaving(true);
+      
+      // Prepare the recipe data
+      const recipeData: Record<string, unknown> = { 
+        ...recipe as Record<string, unknown>,
+        type: 'structured'
+      };
+      
+      // Add the image if present
+      if (recipeImage) {
+        recipeData.imageUrl = recipeImage;
+      }
+      
+      await saveRecipe(user.uid, recipeData);
+      setIsAlreadySaved(true);
+      setSaveSuccess(true);
+      
+      // Reset success message after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -1105,47 +1142,6 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       };
     }, [toggleIngredient]);
     
-    const handleSaveRecipe = async () => {
-      if (!user) {
-        // Show login prompt instead of saving
-        setShowLoginPrompt(true);
-        return;
-      }
-      
-      if (isAlreadySaved) {
-        return; // Already saved, do nothing
-      }
-      
-      try {
-        setIsSaving(true);
-        
-        // Prepare the recipe data - use the original recipe, not the processed content
-        const recipeData: Record<string, unknown> = { 
-            content: recipe, // Keep the original recipe content for storage
-            title: typeof recipe === 'string' 
-              ? (recipe.match(/# (.+?)(\n|$)/)?.[1] || 'Untitled Recipe')
-              : ((recipe as any).title || 'Untitled Recipe'),
-            type: 'markdown'
-        };
-        
-        // Add the image if present
-        if (recipeImage) {
-          recipeData.imageUrl = recipeImage;
-        }
-        
-        await saveRecipe(user.uid, recipeData);
-        setIsAlreadySaved(true);
-        setSaveSuccess(true);
-        
-        // Reset success message after 3 seconds
-        setTimeout(() => setSaveSuccess(false), 3000);
-      } catch (error) {
-        console.error('Error saving recipe:', error);
-      } finally {
-        setIsSaving(false);
-      }
-    };
-    
     // Extract title from the markdown
     const titleMatch = recipe.match(/# (.+?)(\n|$)/);
     const title = titleMatch ? titleMatch[1] : 'Recipe';
@@ -1170,91 +1166,108 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
         )}
         
         {/* Action Buttons at the top */}
-        <div className="p-4 bg-gray-700 flex justify-center gap-4">
-          <button
-            onClick={handleSaveRecipe}
-            disabled={isSaving || isAlreadySaved}
-            className={`flex items-center gap-2 ${
-              isAlreadySaved 
-                ? 'bg-green-600 hover:bg-green-600' 
-                : 'bg-blue-600 hover:bg-blue-500'
-            } text-white px-4 py-2 rounded-lg transition-colors`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-            </svg>
-            {isSaving ? 'Saving...' : isAlreadySaved ? 'Saved' : 'Save Recipe'}
-          </button>
-          
-          <button
-            onClick={handleOpenGroceryList}
-            className={`flex items-center gap-2 ${
-              recipeAddedToList 
-                ? 'bg-green-600 hover:bg-green-700' 
-                : 'bg-gray-600 hover:bg-gray-500'
-            } text-white px-4 py-2 rounded-lg transition-colors`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            {recipeAddedToList ? 'Added to List' : 'Add to Groceries'}
-          </button>
-          
-          {/* Unit toggle button */}
-          <button
-            onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
-            title={unitSystem === 'metric' ? 'Switch to Freedom Units (oz, lb)' : 'Switch to Science Units (g, kg)'}
-          >
-            <div className="flex items-center justify-center w-6 relative">
-              {/* American Flag (Imperial/Freedom) */}
-              <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
-                  <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
-                  <g fill="#d80027">
-                    <path d="M0 85.33h512v42.67H0zM0 170.67h512v42.67H0zM0 256h512v42.67H0zM0 341.33h512V384H0z"/>
-                  </g>
-                  <path fill="#2e52b2" d="M0 85.33h256v198.67H0z"/>
-                  <path fill="#f0f0f0" d="m99.82 160.624-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569L0 160.624l23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569zm93.887 0-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569-23.136-11.064 23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569z"/>
-                </svg>
+        <div className="p-4 bg-gray-700">
+          {/* Button container with grid layout */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {/* Back button */}
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back
+            </button>
+
+            {/* Save Recipe button */}
+            <button
+              onClick={handleSaveRecipe}
+              disabled={isSaving || isAlreadySaved}
+              className={`flex items-center justify-center gap-2 ${
+                isAlreadySaved 
+                  ? 'bg-green-600 hover:bg-green-600' 
+                  : 'bg-blue-600 hover:bg-blue-500'
+              } text-white px-4 py-2 rounded-lg transition-colors`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              {isSaving ? 'Saving...' : isAlreadySaved ? 'Saved' : 'Save Recipe'}
+            </button>
+            
+            {/* Add to Groceries button */}
+            <button
+              onClick={handleOpenGroceryList}
+              className={`flex items-center justify-center gap-2 ${
+                recipeAddedToList 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-gray-600 hover:bg-gray-500'
+              } text-white px-4 py-2 rounded-lg transition-colors`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              {recipeAddedToList ? 'Added to List' : 'Add to Groceries'}
+            </button>
+            
+            {/* Reset Checkboxes button */}
+            <button
+              onClick={resetChecklist}
+              className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Reset Checkboxes
+            </button>
+            
+            {/* Unit toggle button */}
+            <button
+              onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
+              className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+              title={unitSystem === 'metric' ? 'Switch to Freedom Units (oz, lb)' : 'Switch to UK Units (g, kg)'}
+            >
+              <div className="flex items-center justify-center w-6 relative">
+                {/* American Flag (Imperial/Freedom) */}
+                <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                    <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                    <g fill="#d80027">
+                      <path d="M0 85.33h512v42.67H0zM0 170.67h512v42.67H0zM0 256h512v42.67H0zM0 341.33h512V384H0z"/>
+                    </g>
+                    <path fill="#2e52b2" d="M0 85.33h256v198.67H0z"/>
+                    <path fill="#f0f0f0" d="m99.82 160.624-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569L0 160.624l23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569zm93.887 0-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569-23.136-11.064 23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569z"/>
+                  </svg>
+                </div>
+                
+                {/* British Flag (Metric/UK) */}
+                <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                    <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                    <path fill="#0052b4" d="M0 85.33h512v341.33H0z"/>
+                    <path fill="#f0f0f0" d="M512 85.33v42.663L341.331 256l170.667 128v42.667H426.67L256 298.667 85.333 426.666H0v-42.666L170.667 256 0 128V85.333h85.333L256 213.334l170.667-128z"/>
+                    <path d="M288 85.33h-64v138.67H0v64h224v138.67h64V288h224v-64H288z" fill="#f0f0f0"/>
+                    <g fill="#d80027">
+                      <path d="M0 85.33v30.933L151.467 256 0 395.737v30.93h30.933L213.333 256 30.933 85.333zM481.067 85.33H512v30.933L360.533 256 512 395.737v30.93h-30.933L298.667 256 481.067 85.333zM256 85.33v47.186L139.638 85.33H256zM256 426.67V379.48l116.364 47.19z"/>
+                    </g>
+                  </svg>
+                </div>
               </div>
-              
-              {/* British Flag (Metric/Science) */}
-              <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
-                  <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
-                  <path fill="#0052b4" d="M0 85.33h512v341.33H0z"/>
-                  <path fill="#f0f0f0" d="M512 85.33v42.663L341.331 256l170.667 128v42.667H426.67L256 298.667 85.333 426.666H0v-42.666L170.667 256 0 128V85.333h85.333L256 213.334l170.667-128z"/>
-                  <path d="M288 85.33h-64v138.67H0v64h224v138.67h64V288h224v-64H288z" fill="#f0f0f0"/>
-                  <g fill="#d80027">
-                    <path d="M0 85.33v30.933L151.467 256 0 395.737v30.93h30.933L213.333 256 30.933 85.333zM481.067 85.33H512v30.933L360.533 256 512 395.737v30.93h-30.933L298.667 256 481.067 85.333zM256 85.33v47.186L139.638 85.33H256zM256 426.67V379.48l116.364 47.19z"/>
-                  </g>
-                </svg>
-              </div>
-            </div>
-            <span>{unitSystem === 'metric' ? 'Science' : 'Freedom'}</span>
-          </button>
-          
-          {/* Share button */}
-          <button
-            onClick={handleShareRecipe}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            Share
-          </button>
-          
-          <button
-            onClick={resetChecklist}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Reset Checkboxes
-          </button>
+              <span>{unitSystem === 'metric' ? 'UK' : 'Freedom'}</span>
+            </button>
+            
+            {/* Share button */}
+            <button
+              onClick={handleShareRecipe}
+              className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Share
+            </button>
+          </div>
         </div>
         
         {/* Recipe Content with proper padding */}
@@ -1321,127 +1334,151 @@ export default function RecipeDisplay({ recipe, recipeImage, url }: RecipeDispla
       )}
       
       {/* Action Buttons */}
-      <div className="p-4 bg-gray-700 flex justify-center gap-4">
+      <div className="p-4 bg-gray-700">
+        {/* Back button */}
         <button
-          onClick={async () => {
-            if (!user) {
-              setShowLoginPrompt(true);
-              return;
-            }
-            
-            if (isAlreadySaved) {
-              return; // Already saved, do nothing
-            }
-            
-            try {
-              setIsSaving(true);
-              
-              // Prepare the recipe data
-              const recipeData: Record<string, unknown> = { 
-                ...recipe as Record<string, unknown>,
-                type: 'structured'
-              };
-              
-              // Add the image if present
-              if (recipeImage) {
-                recipeData.imageUrl = recipeImage;
-              }
-              
-              await saveRecipe(user.uid, recipeData);
-              setIsAlreadySaved(true);
-              setSaveSuccess(true);
-              
-              // Reset success message after 3 seconds
-              setTimeout(() => setSaveSuccess(false), 3000);
-            } catch (error) {
-              console.error('Error saving recipe:', error);
-            } finally {
-              setIsSaving(false);
-            }
-          }}
-          disabled={isSaving || isAlreadySaved}
-          className={`flex items-center gap-2 ${
-            isAlreadySaved 
-              ? 'bg-green-600 hover:bg-green-600' 
-              : 'bg-blue-600 hover:bg-blue-500'
-          } text-white px-4 py-2 rounded-lg transition-colors`}
+          onClick={() => router.back()}
+          className="mb-4 flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          {isSaving ? 'Saving...' : isAlreadySaved ? 'Saved' : 'Save Recipe'}
+          Back
         </button>
-        
-        <button
-          onClick={handleOpenGroceryList}
-          className={`flex items-center gap-2 ${
-            recipeAddedToList 
-              ? 'bg-green-600 hover:bg-green-700' 
-              : 'bg-gray-600 hover:bg-gray-500'
-          } text-white px-4 py-2 rounded-lg transition-colors`}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          {recipeAddedToList ? 'Added to List' : 'Add to Groceries'}
-        </button>
-        
-        {/* Unit toggle button */}
-        <button
-          onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
-          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
-          title={unitSystem === 'metric' ? 'Switch to Freedom Units (oz, lb)' : 'Switch to Science Units (g, kg)'}
-        >
-          <div className="flex items-center justify-center w-6 relative">
-            {/* American Flag (Imperial/Freedom) */}
-            <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
-                <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
-                <g fill="#d80027">
-                  <path d="M0 85.33h512v42.67H0zM0 170.67h512v42.67H0zM0 256h512v42.67H0zM0 341.33h512V384H0z"/>
-                </g>
-                <path fill="#2e52b2" d="M0 85.33h256v198.67H0z"/>
-                <path fill="#f0f0f0" d="m99.82 160.624-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569L0 160.624l23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569zm93.887 0-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569-23.136-11.064 23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569z"/>
-              </svg>
+
+        {/* Scrollable button container */}
+        <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide">
+          <button
+            onClick={handleSaveRecipe}
+            disabled={isSaving || isAlreadySaved}
+            className={`flex items-center gap-2 flex-shrink-0 ${
+              isAlreadySaved 
+                ? 'bg-green-600 hover:bg-green-600' 
+                : 'bg-blue-600 hover:bg-blue-500'
+            } text-white px-4 py-2 rounded-lg transition-colors`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            {isSaving ? 'Saving...' : isAlreadySaved ? 'Saved' : 'Save Recipe'}
+          </button>
+          
+          <button
+            onClick={handleOpenGroceryList}
+            className={`flex items-center gap-2 flex-shrink-0 ${
+              recipeAddedToList 
+                ? 'bg-green-600 hover:bg-green-700' 
+                : 'bg-gray-600 hover:bg-gray-500'
+            } text-white px-4 py-2 rounded-lg transition-colors`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            {recipeAddedToList ? 'Added to List' : 'Add to Groceries'}
+          </button>
+          
+          {/* Reset Checkboxes button */}
+          <button
+            onClick={resetChecklist}
+            className="flex items-center gap-2 flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Reset Checkboxes
+          </button>
+          
+          {/* Unit toggle button */}
+          <button
+            onClick={() => setUnitSystem(unitSystem === 'metric' ? 'imperial' : 'metric')}
+            className="flex items-center gap-2 flex-shrink-0 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+            title={unitSystem === 'metric' ? 'Switch to Freedom Units (oz, lb)' : 'Switch to UK Units (g, kg)'}
+          >
+            <div className="flex items-center justify-center w-6 relative">
+              {/* American Flag (Imperial/Freedom) */}
+              <div className={`absolute transition-all duration-300 ${unitSystem === 'imperial' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                  <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                  <g fill="#d80027">
+                    <path d="M0 85.33h512v42.67H0zM0 170.67h512v42.67H0zM0 256h512v42.67H0zM0 341.33h512V384H0z"/>
+                  </g>
+                  <path fill="#2e52b2" d="M0 85.33h256v198.67H0z"/>
+                  <path fill="#f0f0f0" d="m99.82 160.624-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569L0 160.624l23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569zm93.887 0-23.137 11.063 12.222 22.568-24.809-6.748-4.075 25.355-16.892-19.479-16.89 19.479-4.076-25.355-24.81 6.749 12.223-22.569-23.136-11.064 23.137-11.063-12.222-22.568 24.809 6.748 4.075-25.355 16.892 19.479 16.89-19.479 4.076 25.355 24.81-6.749-12.223 22.569z"/>
+                </svg>
+              </div>
+              
+              {/* British Flag (Metric/UK) */}
+              <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
+                  <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
+                  <path fill="#0052b4" d="M0 85.33h512v341.33H0z"/>
+                  <path fill="#f0f0f0" d="M512 85.33v42.663L341.331 256l170.667 128v42.667H426.67L256 298.667 85.333 426.666H0v-42.666L170.667 256 0 128V85.333h85.333L256 213.334l170.667-128z"/>
+                  <path d="M288 85.33h-64v138.67H0v64h224v138.67h64V288h224v-64H288z" fill="#f0f0f0"/>
+                  <g fill="#d80027">
+                    <path d="M0 85.33v30.933L151.467 256 0 395.737v30.93h30.933L213.333 256 30.933 85.333zM481.067 85.33H512v30.933L360.533 256 512 395.737v30.93h-30.933L298.667 256 481.067 85.333zM256 85.33v47.186L139.638 85.33H256zM256 426.67V379.48l116.364 47.19z"/>
+                  </g>
+                </svg>
+              </div>
             </div>
-            
-            {/* British Flag (Metric/Science) */}
-            <div className={`absolute transition-all duration-300 ${unitSystem === 'metric' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="h-5 w-6">
-                <path fill="#f0f0f0" d="M0 85.33h512v341.33H0z"/>
-                <path fill="#0052b4" d="M0 85.33h512v341.33H0z"/>
-                <path fill="#f0f0f0" d="M512 85.33v42.663L341.331 256l170.667 128v42.667H426.67L256 298.667 85.333 426.666H0v-42.666L170.667 256 0 128V85.333h85.333L256 213.334l170.667-128z"/>
-                <path d="M288 85.33h-64v138.67H0v64h224v138.67h64V288h224v-64H288z" fill="#f0f0f0"/>
-                <g fill="#d80027">
-                  <path d="M0 85.33v30.933L151.467 256 0 395.737v30.93h30.933L213.333 256 30.933 85.333zM481.067 85.33H512v30.933L360.533 256 512 395.737v30.93h-30.933L298.667 256 481.067 85.333zM256 85.33v47.186L139.638 85.33H256zM256 426.67V379.48l116.364 47.19z"/>
-                </g>
-              </svg>
-            </div>
-          </div>
-          <span>{unitSystem === 'metric' ? 'Science' : 'Freedom'}</span>
-        </button>
-        
-        {/* Share button */}
-        <button
-          onClick={handleShareRecipe}
-          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-          </svg>
-          Share
-        </button>
-        
-        <button
-          onClick={resetChecklist}
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Reset Checkboxes
-        </button>
+            <span>{unitSystem === 'metric' ? 'UK' : 'Freedom'}</span>
+          </button>
+          
+          {/* Share button */}
+          <button
+            onClick={handleShareRecipe}
+            className="flex items-center gap-2 flex-shrink-0 bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            Share
+          </button>
+        </div>
       </div>
+      
+      {/* Recipe Content with proper padding */}
+      <div className="px-6 md:px-8 pb-6 mt-4">
+        <div className="recipe-content" dangerouslySetInnerHTML={{ __html: contentToRender }} />
+      </div>
+      
+      {url && (
+        <div className="mt-4 pt-4 border-t border-gray-700 flex flex-col items-center px-6 pb-6">
+          {/* End message */}
+          <a 
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-400 hover:text-blue-300 text-sm inline-flex items-center gap-2"
+          >
+            View Original Recipe
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
+        </div>
+      )}
+      
+      {/* Shopping List Modal */}
+      {showShoppingList && (
+        <GroceryList 
+          ingredients={extractIngredients()} 
+          recipeName={typeof recipe === 'string' 
+            ? ((recipe as string).match(/# (.+)$/m)?.[1] || 'Recipe')
+            : (recipe as any).title || 'Recipe'} 
+          onClose={() => setShowShoppingList(false)} 
+        />
+      )}
+      
+      {/* Login Prompt Modal */}
+      {showLoginPrompt && (
+        <LoginPrompt 
+          onClose={() => setShowLoginPrompt(false)} 
+          onSignIn={() => {
+            setShowLoginPrompt(false);
+            handleSaveRecipe();
+          }} 
+        />
+      )}
     </div>
   ); 
 }

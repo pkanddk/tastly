@@ -340,7 +340,159 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
     const allItems = getAllItems();
     const sections: Record<string, GroceryItem[]> = {};
     
+    // Create a map to track unique items and their quantities
+    const uniqueItems = new Map<string, GroceryItem>();
+    
+    // Helper function to normalize item names
+    const normalizeItemName = (name: string): string => {
+      return name
+        .toLowerCase()
+        .replace(/\s*\(\d+\)\s*$/, '') // Remove (1), (2), etc. at the end
+        .replace(/^\d+\s+/, '') // Remove leading numbers
+        .replace(/^[a-z]+\s+/, '') // Remove leading units (tablespoon, teaspoon, etc.)
+        .trim();
+    };
+
+    // Helper function to parse quantity
+    const parseQuantity = (qty: string): { number: number; unit: string } | null => {
+      // Common unit variations and their normalized forms
+      const unitMap: { [key: string]: string } = {
+        'tablespoon': 'tablespoons',
+        'tablespoons': 'tablespoons',
+        'tbsp': 'tablespoons',
+        'tbs': 'tablespoons',
+        'teaspoon': 'teaspoons',
+        'teaspoons': 'teaspoons',
+        'tsp': 'teaspoons',
+        'cup': 'cups',
+        'cups': 'cups',
+        'ounce': 'ounces',
+        'ounces': 'ounces',
+        'oz': 'ounces',
+        'pound': 'pounds',
+        'pounds': 'pounds',
+        'lb': 'pounds',
+        'lbs': 'pounds',
+        'whole': '',
+        'half': '',
+        'quarter': '',
+      };
+
+      // Handle fractions in the quantity
+      const fractionMap: { [key: string]: number } = {
+        'half': 0.5,
+        'quarter': 0.25,
+        'fourth': 0.25,
+        'third': 0.333,
+        'three-quarters': 0.75,
+        '¼': 0.25,
+        '½': 0.5,
+        '¾': 0.75,
+        '⅓': 0.333,
+        '⅔': 0.667,
+      };
+
+      // Clean and normalize the quantity string
+      const cleanQty = qty.trim().toLowerCase();
+
+      // Check for fraction words first
+      for (const [word, value] of Object.entries(fractionMap)) {
+        if (cleanQty.includes(word)) {
+          // Extract any whole numbers before the fraction
+          const wholeMatch = cleanQty.match(/(\d+)\s+/);
+          const wholeNumber = wholeMatch ? parseInt(wholeMatch[1]) : 0;
+          
+          // Extract the unit if present
+          let unit = '';
+          for (const [unitWord, normalized] of Object.entries(unitMap)) {
+            if (cleanQty.includes(unitWord)) {
+              unit = normalized;
+              break;
+            }
+          }
+          
+          return { number: wholeNumber + value, unit };
+        }
+      }
+
+      // Try to match decimal or whole numbers with optional units
+      const match = cleanQty.match(/^([\d.]+)\s*(\w+)?/);
+      if (match) {
+        const number = parseFloat(match[1]);
+        let unit = match[2]?.toLowerCase() || '';
+        
+        // Normalize unit if it exists
+        if (unit && unitMap[unit]) {
+          unit = unitMap[unit];
+        }
+        
+        return { number, unit };
+      }
+
+      return null;
+    };
+
+    // Helper function to format quantity for display
+    const formatQuantity = (qty: { number: number; unit: string }): string => {
+      let { number, unit } = qty;
+      
+      // Format the number to handle decimals nicely
+      let formattedNumber: string;
+      if (number === 0.25) formattedNumber = '¼';
+      else if (number === 0.5) formattedNumber = '½';
+      else if (number === 0.75) formattedNumber = '¾';
+      else if (number === 0.333) formattedNumber = '⅓';
+      else if (number === 0.667) formattedNumber = '⅔';
+      else formattedNumber = number.toString();
+      
+      return unit ? `${formattedNumber} ${unit}` : formattedNumber;
+    };
+    
     allItems.forEach(item => {
+      // Get the base name without quantities and units
+      const normalizedName = normalizeItemName(item.name);
+      
+      // Try to extract quantity from both the quantity field and the name
+      const fullItemText = `${item.quantity || ''} ${item.name}`.toLowerCase();
+      const quantityMatch = fullItemText.match(/(\d+(?:\.\d+)?(?:\s*(?:tablespoons?|tbsp|teaspoons?|tsp|cups?|ounces?|oz|pounds?|lbs?|half|quarter|fourth|third|¼|½|¾|⅓|⅔))?)/i);
+      
+      let itemQuantity = '1';
+      if (quantityMatch) {
+        itemQuantity = quantityMatch[1];
+      } else if (item.quantity) {
+        itemQuantity = item.quantity;
+      }
+      
+      if (!uniqueItems.has(normalizedName)) {
+        // If this is the first time seeing this item, add it to the map
+        uniqueItems.set(normalizedName, {
+          ...item,
+          name: normalizedName, // Use the normalized name for display
+          quantity: itemQuantity
+        });
+      } else {
+        // If we've seen this item before, update its quantity
+        const existingItem = uniqueItems.get(normalizedName)!;
+        const existingParsed = parseQuantity(existingItem.quantity);
+        const newParsed = parseQuantity(itemQuantity);
+        
+        if (existingParsed && newParsed && existingParsed.unit === newParsed.unit) {
+          // If both quantities have the same unit, add them
+          const total = existingParsed.number + newParsed.number;
+          existingItem.quantity = formatQuantity({ number: total, unit: existingParsed.unit });
+        } else if (existingParsed && newParsed && !existingParsed.unit && !newParsed.unit) {
+          // If neither has units (e.g., "1" and "1"), add the numbers
+          const total = existingParsed.number + newParsed.number;
+          existingItem.quantity = total.toString();
+        } else {
+          // If units don't match or can't be parsed, show both
+          existingItem.quantity = `${existingItem.quantity} + ${itemQuantity}`;
+        }
+      }
+    });
+    
+    // Convert unique items back to array and group by section
+    Array.from(uniqueItems.values()).forEach(item => {
       if (!sections[item.section]) {
         sections[item.section] = [];
       }
@@ -474,180 +626,180 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
       notifyGroceryListUpdated();
     }
   };
+
+  // Add state for showing all recipes
+  const [showAllRecipes, setShowAllRecipes] = useState(false);
+  const MAX_VISIBLE_RECIPES = 2;
+
+  // Get visible recipes based on showAllRecipes state
+  const visibleRecipes = showAllRecipes ? recipes : recipes.slice(0, MAX_VISIBLE_RECIPES);
   
+  // Check if we have more recipes to show
+  const hasMoreRecipes = recipes.length > MAX_VISIBLE_RECIPES;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center md:p-4 z-50">
-      <div className="bg-gray-900 rounded-xl md:rounded-xl p-4 md:p-6 w-full max-w-3xl md:max-h-[90vh] h-full md:h-auto overflow-y-auto relative">
-        {/* Close button */}
-          <button 
-            onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white"
-          >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        
-        <h2 className="text-2xl font-bold text-white mb-4">Groceries</h2>
-        
-        {/* Tab navigation with horizontal scrolling */}
-        <div className="relative mb-4">
-          {/* Scrollable container */}
-          <div className="flex space-x-2 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1">
-            {/* All Items tab is always present */}
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+      <div className="bg-gray-900 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-white">Grocery List</h2>
             <button
-              onClick={() => setActiveTab('all')}
-              className={`px-4 py-2 rounded-lg flex-shrink-0 ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+              onClick={onClose}
+              className="text-gray-400 hover:text-white"
             >
-              All Items
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
-            
-            {/* Recipe tabs with X buttons */}
-            {recipes.map(recipe => (
-              <div key={recipe.id} className="flex-shrink-0 relative">
-                <button
-                  onClick={() => setActiveTab(recipe.id)}
-                  className={`px-4 pr-8 py-2 rounded-lg whitespace-nowrap overflow-hidden ${activeTab === recipe.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
-                  style={{ maxWidth: '180px', textOverflow: 'ellipsis' }}
-                >
-                  {recipe.name}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent triggering the tab button click
-                    removeRecipe(recipe.id);
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                  aria-label={`Remove ${recipe.name}`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            ))}
           </div>
-          
-          {/* Optional scroll shadows for better UX */}
-          <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-gray-900 to-transparent pointer-events-none"></div>
-        </div>
-        
-        {/* Add custom item form */}
-        <div className="bg-gray-800 rounded-lg p-4 mb-6">
-          <h3 className="text-xl text-blue-400 mb-4">Add Custom Item</h3>
-          
-          <form ref={formRef} onSubmit={(e) => { e.preventDefault(); addCustomItem(); }} className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-3">
-              <div className="relative flex-grow">
-                  <input 
-                  type="text"
-                  value={newItem.name}
-                  onChange={handleInputChange}
-                  placeholder="Item name"
-                  className="bg-gray-900 text-white rounded-lg p-3 w-full"
-                  required
-                />
-                {showSuggestions && suggestions.length > 0 && (
-                  <ul className="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
-                    {suggestions.map((suggestion, index) => (
-                      <li
-                        key={index}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white"
-                      >
-                        {suggestion}
-                </li>
-              ))}
-            </ul>
-                )}
-              </div>
+
+          <div className="relative mb-4">
+            {/* Recipe tabs with X buttons */}
+            <div className="flex flex-wrap gap-2">
+              {/* All Items tab is always present */}
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-2 rounded-lg flex-shrink-0 ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+              >
+                All Items
+              </button>
               
-              <input
-                type="text"
-                value={newItem.quantity}
-                onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
-                placeholder="Quantity"
-                className="bg-gray-900 text-white rounded-lg p-3 w-full md:w-auto"
-              />
+              {/* Visible recipe tabs */}
+              {visibleRecipes.map(recipe => (
+                <div key={recipe.id} className="flex-shrink-0 relative">
+                  <button
+                    onClick={() => setActiveTab(recipe.id)}
+                    className={`px-4 pr-8 py-2 rounded-lg whitespace-nowrap overflow-hidden ${activeTab === recipe.id ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                    style={{ maxWidth: '180px', textOverflow: 'ellipsis' }}
+                  >
+                    {recipe.name}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent triggering the tab button click
+                      removeRecipe(recipe.id);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    aria-label={`Remove ${recipe.name}`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+
+              {/* More button if there are additional recipes */}
+              {hasMoreRecipes && (
+                <button
+                  onClick={() => setShowAllRecipes(!showAllRecipes)}
+                  className="px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 flex items-center gap-2"
+                >
+                  {showAllRecipes ? (
+                    <>
+                      Show Less
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </>
+                  ) : (
+                    <>
+                      More Recipes
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
-            
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors"
-            >
-              Add Item
-            </button>
-          </form>
-          
-          {/* Move these buttons inside the gray box */}
-          <div className="flex flex-col md:flex-row gap-3 mt-4">
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-2 mb-6">
             <button
               onClick={removeCheckedItems}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg transition-colors"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2"
             >
-              Remove Checked Items
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Remove Checked
             </button>
-            
             <button
-              onClick={() => setShowClearConfirmation(true)}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg transition-colors"
+              onClick={handleClearAll}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg flex items-center gap-2"
             >
-              Clear All Items
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear All
             </button>
           </div>
-        </div>
-        
-        {/* Display grocery items based on active tab */}
-        {activeTab === 'all' ? (
-          // Show all items grouped by section
-          <>
-            {Object.entries(getItemsBySection()).map(([section, items]) => (
-              <div key={section} className="mb-8">
-                <h3 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h3>
-                <ul className="space-y-2">
-                  {items.map(item => (
-                    <li key={item.id} className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
-                      <div className="flex items-center">
-                        <input 
-                          type="checkbox" 
-                          checked={item.isChecked}
-                          onChange={() => toggleItemCheck(item.id, item.recipeId)}
-                          className="h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 mr-3"
-                        />
-                        <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-white'}`}>
-                          {item.name} {item.quantity ? `(${item.quantity})` : ''}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => removeGroceryItem(item.id, item.recipeId)}
-                        className="text-red-500 hover:text-red-400"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+
+          {/* Add custom item form */}
+          <div className="bg-gray-800 rounded-lg p-4 mb-6">
+            <h3 className="text-xl text-blue-400 mb-4">Add Custom Item</h3>
+            
+            <form ref={formRef} onSubmit={(e) => { e.preventDefault(); addCustomItem(); }} className="space-y-4">
+              <div className="flex flex-col md:flex-row gap-3">
+                <div className="relative flex-grow">
+                  <input 
+                    type="text"
+                    value={newItem.name}
+                    onChange={handleInputChange}
+                    placeholder="Item name"
+                    className="bg-gray-900 text-white rounded-lg p-3 w-full"
+                    required
+                  />
+                  {showSuggestions && suggestions.length > 0 && (
+                    <ul className="absolute z-10 mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto">
+                      {suggestions.map((suggestion, index) => (
+                        <li
+                          key={index}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="px-4 py-2 hover:bg-gray-700 cursor-pointer text-white"
+                        >
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                
+                <input
+                  type="text"
+                  value={newItem.quantity}
+                  onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                  placeholder="Quantity"
+                  className="bg-gray-900 text-white rounded-lg p-3 w-full md:w-auto"
+                />
               </div>
-            ))}
-          </>
-        ) : (
-          // Show recipe-specific view
-          recipes.find(r => r.id === activeTab) && (
-            <div key={activeTab} className="recipe-list">
-              {/* Group ingredients by section */}
-              {Object.entries(organizeRecipeItemsBySection(activeTab)).map(([section, items]) => (
-                <div key={section} className="mb-6">
-                  <h4 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h4>
+              
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition-colors"
+              >
+                Add Item
+              </button>
+            </form>
+          </div>
+
+          {/* Display grocery items based on active tab */}
+          {activeTab === 'all' ? (
+            // Show all items grouped by section
+            <>
+              {Object.entries(getItemsBySection()).map(([section, items]) => (
+                <div key={section} className="mb-8">
+                  <h3 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h3>
                   <ul className="space-y-2">
                     {items.map(item => (
                       <li key={item.id} className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
                         <div className="flex items-center">
-                          <input
-                            type="checkbox"
+                          <input 
+                            type="checkbox" 
                             checked={item.isChecked}
-                            onChange={() => toggleItemCheck(item.id, activeTab)}
+                            onChange={() => toggleItemCheck(item.id, item.recipeId)}
                             className="h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 mr-3"
                           />
                           <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-white'}`}>
@@ -655,7 +807,7 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
                           </span>
                         </div>
                         <button
-                          onClick={() => removeGroceryItem(item.id, activeTab)}
+                          onClick={() => removeGroceryItem(item.id, item.recipeId)}
                           className="text-red-500 hover:text-red-400"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -667,33 +819,70 @@ const GroceryList: React.FC<GroceryListProps> = ({ ingredients = [], recipeName 
                   </ul>
                 </div>
               ))}
-            </div>
-          )
-        )}
-        
-        {/* Confirmation Modal for Clear All */}
-        {showClearConfirmation && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md">
-              <h3 className="text-xl font-bold text-white mb-4">Clear All Items?</h3>
-              <p className="text-gray-300 mb-6">This will remove all items from your grocery list. This action cannot be undone.</p>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowClearConfirmation(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmClearAll}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors"
-                >
-                  Clear All
-                </button>
+            </>
+          ) : (
+            // Show recipe-specific view
+            recipes.find(r => r.id === activeTab) && (
+              <div key={activeTab} className="recipe-list">
+                {/* Group ingredients by section */}
+                {Object.entries(organizeRecipeItemsBySection(activeTab)).map(([section, items]) => (
+                  <div key={section} className="mb-6">
+                    <h4 className="text-base font-medium text-teal-400 tracking-wider uppercase mb-2">{section}</h4>
+                    <ul className="space-y-2">
+                      {items.map(item => (
+                        <li key={item.id} className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={item.isChecked}
+                              onChange={() => toggleItemCheck(item.id, activeTab)}
+                              className="h-5 w-5 rounded border-gray-600 text-blue-600 focus:ring-blue-500 mr-3"
+                            />
+                            <span className={`${item.isChecked ? 'line-through text-gray-500' : 'text-white'}`}>
+                              {item.name} {item.quantity ? `(${item.quantity})` : ''}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => removeGroceryItem(item.id, activeTab)}
+                            className="text-red-500 hover:text-red-400"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* Clear confirmation modal */}
+          {showClearConfirmation && (
+            <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+              <div className="bg-gray-900 rounded-xl max-w-md w-full p-6">
+                <h3 className="text-xl font-bold text-white mb-4">Clear All Items?</h3>
+                <p className="text-gray-300 mb-6">This will remove all items from your grocery list. This action cannot be undone.</p>
+                <div className="flex justify-end gap-4">
+                  <button
+                    onClick={cancelClearAll}
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmClearAll}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                  >
+                    Clear All
+                  </button>
+                </div>
               </div>
             </div>
+          )}
         </div>
-        )}
       </div>
     </div>
   );
