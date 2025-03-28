@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
+const STORAGE_KEY = 'tastly-pwa-prompt';
+const PROMPT_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
+
 export default function AddToHomeScreen() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -22,9 +25,14 @@ export default function AddToHomeScreen() {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
                         (window.navigator as any).standalone || 
                         document.referrer.includes('android-app://');
+
+    // Check when the prompt was last shown
+    const lastPrompt = localStorage.getItem(STORAGE_KEY);
+    const shouldShowPrompt = !lastPrompt || 
+                           (Date.now() - parseInt(lastPrompt, 10)) > PROMPT_INTERVAL;
     
-    // Only show prompt on mobile devices when not already installed
-    if (isMobile && !isStandalone) {
+    // Only show prompt on mobile devices when not already installed and when enough time has passed
+    if (isMobile && !isStandalone && shouldShowPrompt) {
       // Wait a few seconds before showing the prompt
       const timer = setTimeout(() => {
         setShowPrompt(true);
@@ -33,6 +41,12 @@ export default function AddToHomeScreen() {
       return () => clearTimeout(timer);
     }
   }, []);
+
+  const handleDismiss = () => {
+    setShowPrompt(false);
+    // Save the current timestamp when user dismisses the prompt
+    localStorage.setItem(STORAGE_KEY, Date.now().toString());
+  };
 
   if (!showPrompt) return null;
 
@@ -52,7 +66,7 @@ export default function AddToHomeScreen() {
           )}
         </div>
         <button 
-          onClick={() => setShowPrompt(false)}
+          onClick={handleDismiss}
           className="flex-shrink-0 text-white hover:text-gray-200"
           aria-label="Close prompt"
         >
